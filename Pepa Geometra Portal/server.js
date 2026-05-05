@@ -108,6 +108,8 @@ function clientVisibleDb(db, user) {
     ),
     timeline: db.timeline.filter((entry) => ids.has(entry.projectId)),
     events: db.events.filter((event) => ids.has(event.projectId)),
+    checklist: db.checklist.filter((item) => ids.has(item.projectId)),
+    requests: db.requests.filter((item) => ids.has(item.projectId)),
   };
 }
 
@@ -190,9 +192,35 @@ async function handleApi(req, res) {
       updatedAt: todayLabel(),
       description: payload.description || "Nuovo progetto creato dal gestionale.",
       progress: Number(payload.progress || 5),
+      nextAction: payload.nextAction || "Definire la prossima azione operativa.",
+      nextActionOwner: payload.nextActionOwner || "Studio",
+      nextActionDue: payload.nextActionDue || "Da definire",
     });
     writeDb(db);
     sendJson(res, 201, { ok: true, id });
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/projects/")) {
+    const projectId = decodeURIComponent(url.pathname.replace("/api/projects/", ""));
+    const payload = await bodyJson(req);
+    const project = db.projects.find((item) => item.id === projectId);
+    if (!project) {
+      sendJson(res, 404, { error: "Progetto non trovato" });
+      return;
+    }
+    project.title = payload.title || project.title;
+    project.address = payload.address || project.address;
+    project.status = payload.status || project.status;
+    project.phase = payload.phase || project.phase;
+    project.description = payload.description || project.description;
+    project.progress = Number(payload.progress ?? project.progress);
+    project.nextAction = payload.nextAction || project.nextAction;
+    project.nextActionOwner = payload.nextActionOwner || project.nextActionOwner;
+    project.nextActionDue = payload.nextActionDue || project.nextActionDue;
+    project.updatedAt = todayLabel();
+    writeDb(db);
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -247,6 +275,42 @@ async function handleApi(req, res) {
       month: payload.month.toUpperCase(),
       title: payload.title,
       note: payload.note || "",
+    });
+    writeDb(db);
+    sendJson(res, 201, { ok: true });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/checklist") {
+    const payload = await bodyJson(req);
+    if (!payload.projectId || !payload.label) {
+      sendJson(res, 400, { error: "Progetto e voce checklist sono obbligatori" });
+      return;
+    }
+    db.checklist.unshift({
+      id: `check-${Date.now()}`,
+      projectId: payload.projectId,
+      label: payload.label,
+      status: payload.status || "Da fare",
+    });
+    writeDb(db);
+    sendJson(res, 201, { ok: true });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/requests") {
+    const payload = await bodyJson(req);
+    if (!payload.projectId || !payload.title || !payload.body) {
+      sendJson(res, 400, { error: "Progetto, titolo e testo richiesta sono obbligatori" });
+      return;
+    }
+    db.requests.unshift({
+      id: `req-${Date.now()}`,
+      projectId: payload.projectId,
+      title: payload.title,
+      body: payload.body,
+      status: payload.status || "Aperta",
+      dueDate: payload.dueDate || "Da definire",
     });
     writeDb(db);
     sendJson(res, 201, { ok: true });
@@ -319,5 +383,5 @@ const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || "0.0.0.0";
 server.listen(port, host, () => {
   const visibleHost = host === "0.0.0.0" ? "127.0.0.1" : host;
-  console.log(`Pepa Portal: http://${visibleHost}:${port}`);
+  console.log(`Studio Clementi Portal: http://${visibleHost}:${port}`);
 });

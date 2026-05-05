@@ -10,6 +10,8 @@ const state = {
     documents: [],
     timeline: [],
     events: [],
+    checklist: [],
+    requests: [],
   },
 };
 
@@ -39,13 +41,21 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-async function api(path, options = {}) {
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function api(path, options = {}, retries = 2) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     credentials: "same-origin",
     ...options,
   });
   const payload = await response.json().catch(() => ({}));
+  if (!response.ok && retries > 0 && path.startsWith("/api/") && [404, 502, 503].includes(response.status)) {
+    await wait(900);
+    return api(path, options, retries - 1);
+  }
   if (!response.ok) throw new Error(payload.error || "Operazione non riuscita");
   return payload;
 }
@@ -87,7 +97,7 @@ function renderLogin(message = "") {
   app.innerHTML = `
     <section class="login-view">
       <div class="login-panel">
-        <h1>Pepa Studio</h1>
+        <h1>Studio Clementi</h1>
         <p>Portale operativo per condividere avanzamenti, documenti e scadenze con i clienti dello studio tecnico.</p>
       </div>
       <div class="login-form-wrap">
@@ -97,7 +107,7 @@ function renderLogin(message = "") {
           ${message ? `<p class="form-error">${escapeHtml(message)}</p>` : ""}
           <div class="field">
             <label for="username">Nome utente</label>
-            <input id="username" autocomplete="username" value="pepa" />
+            <input id="username" autocomplete="username" value="clementi" />
           </div>
           <div class="field">
             <label for="password">Password</label>
@@ -105,7 +115,7 @@ function renderLogin(message = "") {
           </div>
           <button class="button" type="submit">Entra nel portale</button>
           <div class="demo-accounts">
-            <button type="button" data-demo-user="pepa" data-demo-pass="studio"><strong>Geometra</strong><br /><span>pepa / studio</span></button>
+            <button type="button" data-demo-user="clementi" data-demo-pass="studio"><strong>Geometra</strong><br /><span>clementi / studio</span></button>
             <button type="button" data-demo-user="bianchi" data-demo-pass="cliente"><strong>Cliente</strong><br /><span>bianchi / cliente</span></button>
           </div>
         </form>
@@ -161,7 +171,7 @@ function shell(content) {
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">P</div>
-        <div><strong>Pepa Studio</strong><span>Portale clienti</span></div>
+        <div><strong>Studio Clementi</strong><span>Portale clienti</span></div>
       </div>
       <nav class="nav">
         ${nav
@@ -208,6 +218,7 @@ function renderAdmin() {
   const views = {
     overview: adminOverview,
     projects: adminProjects,
+    projectDetail: adminProjectDetail,
     documents: adminDocuments,
     clients: adminClients,
   };
@@ -237,7 +248,10 @@ function projectRows(projects) {
           <strong>${escapeHtml(project.title)}</strong>
           <span>${escapeHtml(project.client)} · ${escapeHtml(project.phase)} · aggiornato ${escapeHtml(project.updatedAt)}</span>
         </span>
-        <span class="status ${statusClass(project.status)}">${escapeHtml(project.status)}</span>
+        <span class="split-actions">
+          <span class="status ${statusClass(project.status)}">${escapeHtml(project.status)}</span>
+          <span class="button secondary row-action">Apri</span>
+        </span>
       </button>
     `,
     )
@@ -287,6 +301,55 @@ function eventRows(projectId) {
       <div class="calendar-day">
         <div class="date-badge">${escapeHtml(event.day)}<small>${escapeHtml(event.month)}</small></div>
         <div><strong>${escapeHtml(event.title)}</strong><br /><span class="muted">${escapeHtml(event.note)}</span></div>
+      </div>
+    `,
+    )
+    .join("");
+}
+
+function nextActionPanel(project) {
+  return `
+    <section class="panel">
+      <div class="panel-header"><h2>Cosa succede adesso</h2></div>
+      <div class="panel-body next-action">
+        <strong>${escapeHtml(project.nextAction || "Prossima azione da definire.")}</strong>
+        <div class="next-action-meta">
+          <span>A carico di: ${escapeHtml(project.nextActionOwner || "Studio")}</span>
+          <span>Scadenza: ${escapeHtml(project.nextActionDue || "Da definire")}</span>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function checklistRows(projectId) {
+  const items = state.data.checklist.filter((item) => item.projectId === projectId);
+  if (!items.length) return `<div class="empty-state">Checklist non ancora compilata.</div>`;
+  return items
+    .map(
+      (item) => `
+      <div class="check-item">
+        <span class="check-dot ${statusClass(item.status)}"></span>
+        <span><strong>${escapeHtml(item.label)}</strong><br /><span class="muted">${escapeHtml(item.status)}</span></span>
+      </div>
+    `,
+    )
+    .join("");
+}
+
+function requestRows(projectId) {
+  const items = state.data.requests.filter((item) => item.projectId === projectId);
+  if (!items.length) return `<div class="empty-state">Nessuna richiesta aperta per il cliente.</div>`;
+  return items
+    .map(
+      (item) => `
+      <div class="request-item">
+        <div>
+          <strong>${escapeHtml(item.title)}</strong>
+          <p class="muted">${escapeHtml(item.body)}</p>
+          <span class="doc-meta">Scadenza: ${escapeHtml(item.dueDate)}</span>
+        </div>
+        <span class="status ${statusClass(item.status)}">${escapeHtml(item.status)}</span>
       </div>
     `,
     )
@@ -344,9 +407,222 @@ function adminProjects() {
           <div class="field wide"><label>Indirizzo</label><input name="address" /></div>
           <div class="field"><label>Fase</label><input name="phase" value="Avvio incarico" /></div>
           <div class="field"><label>Avanzamento %</label><input name="progress" type="number" min="0" max="100" value="5" /></div>
+          <div class="field wide"><label>Prossima azione</label><textarea name="nextAction">Definire la prossima azione operativa.</textarea></div>
+          <div class="field"><label>A carico di</label><select name="nextActionOwner"><option>Studio</option><option>Cliente</option><option>Nessuno</option></select></div>
+          <div class="field"><label>Scadenza prossima azione</label><input name="nextActionDue" value="Da definire" /></div>
           <div class="field wide"><label>Descrizione</label><textarea name="description"></textarea></div>
           <button class="button wide" type="submit">Crea progetto</button>
         </form>
+      </section>
+    </div>
+  `;
+}
+
+function adminProjectDetail() {
+  const project = currentProject();
+  if (!project) {
+    return `
+      <div class="topbar">
+        <div>
+          <h1>Nessun progetto selezionato</h1>
+          <p>Torna all'archivio progetti e apri una pratica.</p>
+        </div>
+        <button class="button secondary" data-route-inline="projects">Torna ai progetti</button>
+      </div>
+    `;
+  }
+  const projectDocuments = state.data.documents.filter((doc) => doc.projectId === project.id);
+  return `
+    <div class="topbar project-topbar">
+      <div>
+        <h1>${escapeHtml(project.title)}</h1>
+        <p>${escapeHtml(project.description)}</p>
+      </div>
+      <div class="toolbar">
+        <button class="button secondary" data-route-inline="projects">Archivio progetti</button>
+        <span class="status ${statusClass(project.status)}">${escapeHtml(project.status)}</span>
+      </div>
+    </div>
+    <div class="project-console">
+      <section class="project-section">
+        <div class="section-heading">
+          <span>01</span>
+          <div><h2>Panoramica</h2><p>Informazioni che descrivono lo stato generale del progetto.</p></div>
+        </div>
+        <div class="section-grid">
+          <div class="read-zone">
+            ${nextActionPanel(project)}
+            <section class="panel">
+              <div class="panel-header"><h2>Dati progetto</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-body">
+                <dl class="info-table">
+                  <dt>Cliente</dt><dd>${escapeHtml(project.client)}</dd>
+                  <dt>Indirizzo</dt><dd>${escapeHtml(project.address)}</dd>
+                  <dt>Fase</dt><dd>${escapeHtml(project.phase)}</dd>
+                  <dt>Avanzamento</dt><dd>${escapeHtml(project.progress)}%</dd>
+                  <dt>Aggiornato</dt><dd>${escapeHtml(project.updatedAt)}</dd>
+                </dl>
+              </div>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Modifica panoramica</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="projectUpdate" data-project-id="${escapeHtml(project.id)}">
+                <div class="field wide"><label>Titolo</label><input name="title" value="${escapeHtml(project.title)}" required /></div>
+                <div class="field wide"><label>Indirizzo</label><input name="address" value="${escapeHtml(project.address)}" /></div>
+                <div class="field"><label>Stato</label><select name="status">
+                  ${["In corso", "In attesa", "Completato"].map((status) => `<option ${project.status === status ? "selected" : ""}>${status}</option>`).join("")}
+                </select></div>
+                <div class="field"><label>Avanzamento %</label><input name="progress" type="number" min="0" max="100" value="${escapeHtml(project.progress)}" /></div>
+                <div class="field wide"><label>Fase</label><input name="phase" value="${escapeHtml(project.phase)}" /></div>
+                <div class="field wide"><label>Prossima azione</label><textarea name="nextAction">${escapeHtml(project.nextAction || "")}</textarea></div>
+                <div class="field"><label>A carico di</label><select name="nextActionOwner">
+                  ${["Studio", "Cliente", "Nessuno"].map((owner) => `<option ${project.nextActionOwner === owner ? "selected" : ""}>${owner}</option>`).join("")}
+                </select></div>
+                <div class="field"><label>Scadenza</label><input name="nextActionDue" value="${escapeHtml(project.nextActionDue || "")}" /></div>
+                <div class="field wide"><label>Descrizione</label><textarea name="description">${escapeHtml(project.description)}</textarea></div>
+                <button class="button wide" type="submit">Salva panoramica</button>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="project-section">
+        <div class="section-heading">
+          <span>02</span>
+          <div><h2>Checklist operativa</h2><p>Punti di avanzamento e nuove attivita' nello stesso blocco.</p></div>
+        </div>
+        <div class="section-grid">
+          <div class="read-zone">
+            <section class="panel">
+              <div class="panel-header"><h2>Checklist progetto</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-body checklist">${checklistRows(project.id)}</div>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Aggiungi voce</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="checklist">
+                <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+                <div class="field wide"><label>Voce</label><input name="label" required /></div>
+                <div class="field wide"><label>Stato</label><select name="status"><option>Da fare</option><option>In corso</option><option>Completato</option></select></div>
+                <button class="button wide" type="submit">Aggiungi alla checklist</button>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="project-section">
+        <div class="section-heading">
+          <span>03</span>
+          <div><h2>Richieste al cliente</h2><p>Richieste pubblicate al cliente e modulo per crearne una nuova.</p></div>
+        </div>
+        <div class="section-grid">
+          <div class="read-zone">
+            <section class="panel">
+              <div class="panel-header"><h2>Richieste pubblicate</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-body request-list">${requestRows(project.id)}</div>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Nuova richiesta</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="request">
+                <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+                <div class="field wide"><label>Titolo</label><input name="title" required /></div>
+                <div class="field wide"><label>Testo richiesta</label><textarea name="body" required></textarea></div>
+                <div class="field"><label>Stato</label><select name="status"><option>Aperta</option><option>In attesa cliente</option><option>Completata</option></select></div>
+                <div class="field"><label>Scadenza</label><input name="dueDate" value="Da definire" /></div>
+                <button class="button wide" type="submit">Pubblica richiesta</button>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="project-section">
+        <div class="section-heading">
+          <span>04</span>
+          <div><h2>Documentazione</h2><p>Documenti collegati alla pratica e registrazione di nuovi file.</p></div>
+        </div>
+        <div class="section-grid">
+          <div class="read-zone">
+            <section class="panel">
+              <div class="panel-header"><h2>Documenti del progetto</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-body document-list">${documentRows(projectDocuments)}</div>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Aggiungi documento</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="document">
+                <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+                <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
+                <div class="field"><label>Tipo</label><input name="type" value="PDF" /></div>
+                <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
+                <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
+                <button class="button wide" type="submit">Registra documento</button>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="project-section">
+        <div class="section-heading">
+          <span>05</span>
+          <div><h2>Aggiornamenti</h2><p>Timeline visibile al cliente e nuovo aggiornamento da pubblicare.</p></div>
+        </div>
+        <div class="section-grid">
+          <div class="read-zone">
+            <section class="panel">
+              <div class="panel-header"><h2>Timeline pubblicata</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-body timeline">${timelineRows(project.id)}</div>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Nuovo aggiornamento</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="timeline">
+                <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+                <div class="field wide"><label>Titolo</label><input name="title" required /></div>
+                <div class="field wide"><label>Testo</label><textarea name="body" required></textarea></div>
+                <button class="button wide" type="submit">Pubblica aggiornamento</button>
+              </form>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="project-section">
+        <div class="section-heading">
+          <span>06</span>
+          <div><h2>Calendario</h2><p>Scadenze presenti e creazione di nuovi appuntamenti o promemoria.</p></div>
+        </div>
+        <div class="section-grid">
+          <div class="read-zone">
+            <section class="panel">
+              <div class="panel-header"><h2>Scadenze progetto</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-body event-list">${eventRows(project.id)}</div>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Nuova scadenza</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="event">
+                <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+                <div class="field"><label>Giorno</label><input name="day" maxlength="2" placeholder="07" required /></div>
+                <div class="field"><label>Mese</label><input name="month" maxlength="3" placeholder="MAG" required /></div>
+                <div class="field wide"><label>Titolo</label><input name="title" required /></div>
+                <div class="field wide"><label>Nota</label><textarea name="note"></textarea></div>
+                <button class="button wide" type="submit">Aggiungi scadenza</button>
+              </form>
+            </section>
+          </div>
+        </div>
       </section>
     </div>
   `;
@@ -357,47 +633,69 @@ function adminDocuments() {
     <div class="topbar">
       <div>
         <h1>Documenti</h1>
-        <p>Il geometra registra i documenti e decide se renderli visibili al cliente o tenerli interni.</p>
+        <p>Console generale per pubblicare documenti, aggiornamenti e scadenze senza entrare nel singolo progetto.</p>
       </div>
     </div>
-    <div class="grid two">
-      <section class="panel">
-        <div class="panel-header"><h2>Documenti recenti</h2></div>
-        <div class="panel-body document-list">${documentRows(state.data.documents)}</div>
+    <div class="project-console">
+      <section class="project-section">
+        <div class="section-heading">
+          <span>01</span>
+          <div><h2>Documenti</h2><p>Archivio e caricamento documento sono nella stessa area.</p></div>
+        </div>
+        <div class="section-grid">
+          <div class="read-zone">
+            <section class="panel">
+              <div class="panel-header"><h2>Documenti recenti</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-body document-list">${documentRows(state.data.documents)}</div>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Nuovo documento</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="document">
+                <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
+                <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
+                <div class="field"><label>Tipo</label><input name="type" value="PDF" /></div>
+                <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
+                <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
+                <button class="button wide" type="submit">Registra documento</button>
+              </form>
+            </section>
+          </div>
+        </div>
       </section>
-      <section class="panel">
-        <div class="panel-header"><h2>Nuovo documento</h2></div>
-        <form class="panel-body form-grid" data-form="document">
-          <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
-          <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
-          <div class="field"><label>Tipo</label><input name="type" value="PDF" /></div>
-          <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
-          <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
-          <button class="button wide" type="submit">Registra documento</button>
-        </form>
-      </section>
-    </div>
-    <br />
-    <div class="grid two">
-      <section class="panel">
-        <div class="panel-header"><h2>Nuovo aggiornamento timeline</h2></div>
-        <form class="panel-body form-grid" data-form="timeline">
-          <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
-          <div class="field wide"><label>Titolo</label><input name="title" required /></div>
-          <div class="field wide"><label>Testo</label><textarea name="body" required></textarea></div>
-          <button class="button wide" type="submit">Pubblica aggiornamento</button>
-        </form>
-      </section>
-      <section class="panel">
-        <div class="panel-header"><h2>Nuova scadenza</h2></div>
-        <form class="panel-body form-grid" data-form="event">
-          <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
-          <div class="field"><label>Giorno</label><input name="day" maxlength="2" placeholder="07" required /></div>
-          <div class="field"><label>Mese</label><input name="month" maxlength="3" placeholder="MAG" required /></div>
-          <div class="field wide"><label>Titolo</label><input name="title" required /></div>
-          <div class="field wide"><label>Nota</label><textarea name="note"></textarea></div>
-          <button class="button wide" type="submit">Aggiungi scadenza</button>
-        </form>
+
+      <section class="project-section">
+        <div class="section-heading">
+          <span>02</span>
+          <div><h2>Aggiornamenti e scadenze</h2><p>Pubblicazioni rapide per il progetto selezionato.</p></div>
+        </div>
+        <div class="section-grid even">
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Nuovo aggiornamento timeline</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="timeline">
+                <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
+                <div class="field wide"><label>Titolo</label><input name="title" required /></div>
+                <div class="field wide"><label>Testo</label><textarea name="body" required></textarea></div>
+                <button class="button wide" type="submit">Pubblica aggiornamento</button>
+              </form>
+            </section>
+          </div>
+          <div class="write-zone">
+            <section class="panel action-panel">
+              <div class="panel-header"><h2>Nuova scadenza</h2><span class="edit-pill">Gestione</span></div>
+              <form class="panel-body form-grid" data-form="event">
+                <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
+                <div class="field"><label>Giorno</label><input name="day" maxlength="2" placeholder="07" required /></div>
+                <div class="field"><label>Mese</label><input name="month" maxlength="3" placeholder="MAG" required /></div>
+                <div class="field wide"><label>Titolo</label><input name="title" required /></div>
+                <div class="field wide"><label>Nota</label><textarea name="note"></textarea></div>
+                <button class="button wide" type="submit">Aggiungi scadenza</button>
+              </form>
+            </section>
+          </div>
+        </div>
       </section>
     </div>
   `;
@@ -481,10 +779,13 @@ function clientProject() {
       <span class="status ${statusClass(project.status)}">${escapeHtml(project.status)}</span>
     </div>
     <div class="project-layout">
-      <section class="panel">
-        <div class="panel-header"><h2>Timeline progetto</h2></div>
-        <div class="panel-body timeline">${timelineRows(project.id)}</div>
-      </section>
+      <div class="grid">
+        ${nextActionPanel(project)}
+        <section class="panel">
+          <div class="panel-header"><h2>Timeline progetto</h2></div>
+          <div class="panel-body timeline">${timelineRows(project.id)}</div>
+        </section>
+      </div>
       <aside class="grid">
         <section class="panel">
           <div class="panel-header"><h2>Informazioni</h2><span class="readonly-pill">Sola lettura</span></div>
@@ -503,6 +804,17 @@ function clientProject() {
           <div class="panel-body document-list">${documentRows(state.data.documents.filter((doc) => doc.projectId === project.id))}</div>
         </section>
       </aside>
+    </div>
+    <br />
+    <div class="grid two">
+      <section class="panel">
+        <div class="panel-header"><h2>Checklist progetto</h2><span class="readonly-pill">Sola lettura</span></div>
+        <div class="panel-body checklist">${checklistRows(project.id)}</div>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><h2>Richieste al cliente</h2><span class="readonly-pill">Sola lettura</span></div>
+        <div class="panel-body request-list">${requestRows(project.id)}</div>
+      </section>
     </div>
   `;
 }
@@ -556,7 +868,14 @@ function bindWorkspaceActions() {
   document.querySelectorAll("[data-project]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedProjectId = button.dataset.project;
-      state.route = state.user.role === "Geometra" ? "projects" : "project";
+      state.route = state.user.role === "Geometra" ? "projectDetail" : "project";
+      renderWorkspace();
+    });
+  });
+
+  document.querySelectorAll("[data-route-inline]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.route = button.dataset.routeInline;
       renderWorkspace();
     });
   });
@@ -573,16 +892,25 @@ function bindAdminForms() {
     timeline: "/api/timeline",
     event: "/api/events",
     client: "/api/clients",
+    checklist: "/api/checklist",
+    request: "/api/requests",
   };
   document.querySelectorAll("[data-form]").forEach((form) => {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const type = form.dataset.form;
       try {
-        await api(endpoints[type], {
-          method: "POST",
-          body: JSON.stringify(formValues(form)),
-        });
+        if (type === "projectUpdate") {
+          await api(`/api/projects/${encodeURIComponent(form.dataset.projectId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(formValues(form)),
+          });
+        } else {
+          await api(endpoints[type], {
+            method: "POST",
+            body: JSON.stringify(formValues(form)),
+          });
+        }
         await loadBootstrap();
         renderWorkspace();
       } catch (error) {
