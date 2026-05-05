@@ -1,0 +1,173 @@
+{
+  "users": [
+    {
+      "id": "user-pepa",
+      "username": "pepa",
+      "password": "studio",
+      "name": "Pepa",
+      "role": "Geometra",
+      "email": "pepa@studio.it"
+    },
+    {
+      "id": "user-bianchi",
+      "username": "bianchi",
+      "password": "cliente",
+      "name": "Marco Bianchi",
+      "role": "Cliente",
+      "email": "cliente@bianchi.it",
+      "clientId": "cliente-bianchi"
+    }
+  ],
+  "clients": [
+    {
+      "id": "cliente-bianchi",
+      "name": "Marco Bianchi",
+      "email": "cliente@bianchi.it",
+      "phone": "+39 333 000 1000"
+    },
+    {
+      "id": "cliente-verdi",
+      "name": "Laura Verdi",
+      "email": "laura@verdi.it",
+      "phone": "+39 333 000 2000"
+    },
+    {
+      "id": "cliente-neri",
+      "name": "Giulia Neri",
+      "email": "giulia@neri.it",
+      "phone": "+39 333 000 3000"
+    }
+  ],
+  "projects": [
+    {
+      "id": "villa-bianchi",
+      "clientId": "cliente-bianchi",
+      "title": "Ristrutturazione Villa Bianchi",
+      "client": "Marco Bianchi",
+      "address": "Via Roma 18, Brescia",
+      "status": "In corso",
+      "phase": "Pratica edilizia",
+      "updatedAt": "02 Mag 2026",
+      "description": "Intervento di ristrutturazione interna con aggiornamento catastale e coordinamento delle pratiche comunali.",
+      "progress": 62
+    },
+    {
+      "id": "negozio-verdi",
+      "clientId": "cliente-verdi",
+      "title": "Cambio destinazione uso - Verdi",
+      "client": "Laura Verdi",
+      "address": "Corso Milano 44, Verona",
+      "status": "In attesa",
+      "phase": "Documenti cliente",
+      "updatedAt": "29 Apr 2026",
+      "description": "Preparazione documentazione per cambio destinazione d'uso da deposito a spazio commerciale.",
+      "progress": 35
+    },
+    {
+      "id": "studio-neri",
+      "clientId": "cliente-neri",
+      "title": "Accatastamento Studio Neri",
+      "client": "Giulia Neri",
+      "address": "Piazza Garibaldi 7, Mantova",
+      "status": "Completato",
+      "phase": "Consegna finale",
+      "updatedAt": "18 Apr 2026",
+      "description": "Accatastamento e consegna planimetrie aggiornate per studio professionale.",
+      "progress": 100
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc-relazione-bianchi",
+      "projectId": "villa-bianchi",
+      "title": "Relazione tecnica preliminare",
+      "type": "PDF",
+      "version": "v1.2",
+      "date": "02 Mag 2026",
+      "visibility": "Cliente"
+    },
+    {
+      "id": "doc-planimetria-bianchi",
+      "projectId": "villa-bianchi",
+      "title": "Planimetria stato di fatto",
+      "type": "DWG",
+      "version": "v1.0",
+      "date": "27 Apr 2026",
+      "visibility": "Cliente"
+    },
+    {
+      "id": "doc-preventivo-bianchi",
+      "projectId": "villa-bianchi",
+      "title": "Preventivo opere tecniche",
+      "type": "PDF",
+      "version": "v1.1",
+      "date": "21 Apr 2026",
+      "visibility": "Interno"
+    },
+    {
+      "id": "doc-integrazione-verdi",
+      "projectId": "negozio-verdi",
+      "title": "Richiesta integrazione documenti",
+      "type": "PDF",
+      "version": "v1.0",
+      "date": "29 Apr 2026",
+      "visibility": "Cliente"
+    }
+  ],
+  "timeline": [
+    {
+      "id": "time-relazione-bianchi",
+      "projectId": "villa-bianchi",
+      "date": "02 Mag 2026",
+      "title": "Caricata relazione aggiornata",
+      "body": "Aggiunta la nuova versione della relazione tecnica con le note richieste dal Comune."
+    },
+    {
+      "id": "time-pratica-bianchi",
+      "projectId": "villa-bianchi",
+      "date": "30 Apr 2026",
+      "title": "Pratica edilizia inviata",
+      "body": "La pratica e' stata inviata tramite portale comunale. In attesa di protocollo."
+    },
+    {
+      "id": "time-sopralluogo-bianchi",
+      "projectId": "villa-bianchi",
+      "date": "24 Apr 2026",
+      "title": "Sopralluogo completato",
+      "body": "Misure verificate e fotografie di cantiere archiviate nella cartella interna."
+    },
+    {
+      "id": "time-integrazione-verdi",
+      "projectId": "negozio-verdi",
+      "date": "29 Apr 2026",
+      "title": "Integrazione richiesta",
+      "body": "Servono visura aggiornata e documento di identita' del legale rappresentante."
+    }
+  ],
+  "events": [
+    {
+      "id": "event-protocollo-bianchi",
+      "projectId": "villa-bianchi",
+      "day": "07",
+      "month": "MAG",
+      "title": "Protocollo pratica",
+      "note": "Verifica ricezione dal portale comunale."
+    },
+    {
+      "id": "event-call-bianchi",
+      "projectId": "villa-bianchi",
+      "day": "13",
+      "month": "MAG",
+      "title": "Call con cliente",
+      "note": "Aggiornamento su tempi e prossime firme."
+    },
+    {
+      "id": "event-documenti-verdi",
+      "projectId": "negozio-verdi",
+      "day": "09",
+      "month": "MAG",
+      "title": "Scadenza documenti",
+      "note": "Attesa integrazioni da parte del cliente."
+    }
+  ]
+}
