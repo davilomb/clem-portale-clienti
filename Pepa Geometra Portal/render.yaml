@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: pepa-geometra-portal
+    name: studio-clementi-portale-clienti
     runtime: node
     plan: free
     buildCommand: ""

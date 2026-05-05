@@ -1,6 +1,6 @@
-# Pepa Studio - Portale Clienti
+# Studio Clementi - Portale Clienti
 
-Prima bozza locale del gestionale per lo studio del geometra Pepa.
+Prima bozza locale del portale clienti per Studio Clementi.
 
 ## Come avviarlo
 
@@ -18,7 +18,7 @@ http://127.0.0.1:4173
 
 Profili demo:
 
-- Geometra: `pepa` / `studio`
+- Geometra: `clementi` / `studio`
 - Cliente: `bianchi` / `cliente`
 
 ## Cosa contiene questa versione
@@ -33,6 +33,10 @@ Profili demo:
 - Timeline degli aggiornamenti gestita solo dal geometra.
 - Calendario/scadenze gestiti solo dal geometra.
 - Creazione cliente e accesso cliente dal backend geometra.
+- Dettaglio progetto navigabile.
+- Prossima azione visibile nel cruscotto.
+- Checklist progetto.
+- Richieste al cliente in sola lettura lato cliente.
 
 ## Prossimi passaggi tecnici
 
@@ -83,6 +87,6 @@ Prima di usarlo con clienti reali conviene aggiungere:
 Su un piccolo server Linux puoi usare Docker:
 
 ```bash
-docker build -t pepa-geometra-portal .
-docker run -p 4173:4173 pepa-geometra-portal
+docker build -t studio-clementi-portale-clienti .
+docker run -p 4173:4173 studio-clementi-portale-clienti
 ```

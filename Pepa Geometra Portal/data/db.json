@@ -1,12 +1,12 @@
 {
   "users": [
     {
-      "id": "user-pepa",
-      "username": "pepa",
+      "id": "user-clementi",
+      "username": "clementi",
       "password": "studio",
-      "name": "Pepa",
+      "name": "Studio Clementi",
       "role": "Geometra",
-      "email": "pepa@studio.it"
+      "email": "info@studioclementi.it"
     },
     {
       "id": "user-bianchi",
@@ -47,9 +47,12 @@
       "address": "Via Roma 18, Brescia",
       "status": "In corso",
       "phase": "Pratica edilizia",
-      "updatedAt": "02 Mag 2026",
+      "updatedAt": "05 Mag 2026",
       "description": "Intervento di ristrutturazione interna con aggiornamento catastale e coordinamento delle pratiche comunali.",
-      "progress": 62
+      "progress": 62,
+      "nextAction": "Attesa protocollo comunale e verifica ricevuta di deposito.",
+      "nextActionOwner": "Studio",
+      "nextActionDue": "07 Mag 2026"
     },
     {
       "id": "negozio-verdi",
@@ -61,7 +64,10 @@
       "phase": "Documenti cliente",
       "updatedAt": "29 Apr 2026",
       "description": "Preparazione documentazione per cambio destinazione d'uso da deposito a spazio commerciale.",
-      "progress": 35
+      "progress": 35,
+      "nextAction": "Invio documenti integrativi richiesti allo studio.",
+      "nextActionOwner": "Cliente",
+      "nextActionDue": "09 Mag 2026"
     },
     {
       "id": "studio-neri",
@@ -73,7 +79,10 @@
       "phase": "Consegna finale",
       "updatedAt": "18 Apr 2026",
       "description": "Accatastamento e consegna planimetrie aggiornate per studio professionale.",
-      "progress": 100
+      "progress": 100,
+      "nextAction": "Nessuna azione richiesta. Pratica archiviata.",
+      "nextActionOwner": "Nessuno",
+      "nextActionDue": "Completata"
     }
   ],
   "documents": [
@@ -168,6 +177,68 @@
       "month": "MAG",
       "title": "Scadenza documenti",
       "note": "Attesa integrazioni da parte del cliente."
+    }
+  ],
+  "checklist": [
+    {
+      "id": "check-bianchi-1",
+      "projectId": "villa-bianchi",
+      "label": "Sopralluogo completato",
+      "status": "Completato"
+    },
+    {
+      "id": "check-bianchi-2",
+      "projectId": "villa-bianchi",
+      "label": "Relazione tecnica aggiornata",
+      "status": "Completato"
+    },
+    {
+      "id": "check-bianchi-3",
+      "projectId": "villa-bianchi",
+      "label": "Protocollo comunale",
+      "status": "In corso"
+    },
+    {
+      "id": "check-bianchi-4",
+      "projectId": "villa-bianchi",
+      "label": "Consegna documentazione finale",
+      "status": "Da fare"
+    },
+    {
+      "id": "check-verdi-1",
+      "projectId": "negozio-verdi",
+      "label": "Raccolta documenti cliente",
+      "status": "In corso"
+    },
+    {
+      "id": "check-verdi-2",
+      "projectId": "negozio-verdi",
+      "label": "Verifica cambio destinazione d'uso",
+      "status": "Da fare"
+    },
+    {
+      "id": "check-neri-1",
+      "projectId": "studio-neri",
+      "label": "Planimetrie consegnate",
+      "status": "Completato"
+    }
+  ],
+  "requests": [
+    {
+      "id": "req-bianchi-1",
+      "projectId": "villa-bianchi",
+      "title": "Conferma disponibilita' per call",
+      "body": "Lo studio propone una call di aggiornamento il 13 Maggio.",
+      "status": "Aperta",
+      "dueDate": "12 Mag 2026"
+    },
+    {
+      "id": "req-verdi-1",
+      "projectId": "negozio-verdi",
+      "title": "Invio visura aggiornata",
+      "body": "Serve una visura camerale aggiornata per completare la pratica.",
+      "status": "In attesa cliente",
+      "dueDate": "09 Mag 2026"
     }
   ]
 }
