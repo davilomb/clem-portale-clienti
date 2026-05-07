@@ -18,6 +18,11 @@ const contentTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".md": "text/markdown; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
 };
 
 function readJsonDb() {
@@ -197,7 +202,32 @@ function clientVisibleDb(db, user) {
     events: db.events.filter((event) => ids.has(event.projectId)),
     checklist: db.checklist.filter((item) => ids.has(item.projectId)),
     requests: db.requests.filter((item) => ids.has(item.projectId)),
+    notifications: [],
   };
+}
+
+function clientForProject(db, projectId) {
+  const project = db.projects.find((item) => item.id === projectId);
+  if (!project) return null;
+  return db.clients.find((client) => client.id === project.clientId) || null;
+}
+
+async function queueNotification(store, db, payload) {
+  const client = clientForProject(db, payload.projectId);
+  if (!client?.email) return null;
+  return store.insert("notifications", {
+    id: `note-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+    projectId: payload.projectId,
+    recipientEmail: client.email,
+    notificationType: payload.notificationType,
+    relatedType: payload.relatedType,
+    relatedId: payload.relatedId,
+    subject: payload.subject,
+    message: payload.message,
+    status: "Da inviare",
+    createdAt: todayLabel(),
+    sentAt: "",
+  });
 }
 
 function toSnake(value) {
@@ -238,6 +268,11 @@ function fromSnake(row) {
     version: row.version,
     date: row.date,
     visibility: row.visibility,
+    category: row.category,
+    tags: row.tags,
+    documentStatus: row.document_status,
+    parentDocumentId: row.parent_document_id,
+    versionNumber: row.version_number,
     storageKey: row.storage_key,
     fileName: row.file_name,
     mimeType: row.mime_type,
@@ -248,6 +283,13 @@ function fromSnake(row) {
     note: row.note,
     label: row.label,
     dueDate: row.due_date,
+    recipientEmail: row.recipient_email,
+    notificationType: row.notification_type,
+    relatedType: row.related_type,
+    relatedId: row.related_id,
+    subject: row.subject,
+    message: row.message,
+    sentAt: row.sent_at,
   };
 }
 
@@ -273,6 +315,14 @@ async function tableGet(table, query = "select=*") {
     headers: { Accept: "application/json" },
   });
   return rows.map(fromSnake);
+}
+
+async function optionalTableGet(table, query = "select=*") {
+  try {
+    return await tableGet(table, query);
+  } catch (error) {
+    return [];
+  }
 }
 
 async function tableInsert(table, row) {
@@ -332,28 +382,33 @@ async function storageSignedUrl(storageKey) {
     },
   );
   if (!payload?.signedURL) throw new Error("Link documento non disponibile");
-  return payload.signedURL.startsWith("http") ? payload.signedURL : `${supabaseUrl}${payload.signedURL}`;
+  if (payload.signedURL.startsWith("http")) return payload.signedURL;
+  if (payload.signedURL.startsWith("/storage/v1/")) return `${supabaseUrl}${payload.signedURL}`;
+  if (payload.signedURL.startsWith("/object/")) return `${supabaseUrl}/storage/v1${payload.signedURL}`;
+  return `${supabaseUrl}/storage/v1/${payload.signedURL.replace(/^\/+/, "")}`;
 }
 
 async function readDb() {
   if (!useSupabase) return readJsonDb();
-  const [users, clients, projects, documents, timeline, events, checklist, requests] =
+  const [users, clients, projects, documents, timeline, events, checklist, requests, notifications] =
     await Promise.all([
       tableGet("users", "select=*"),
       tableGet("clients", "select=*"),
       tableGet("projects", "select=*&order=updated_at.desc"),
-      tableGet("documents", "select=*&order=date.desc"),
+      tableGet("documents", "select=*&order=date.desc,version_number.desc"),
       tableGet("timeline", "select=*&order=date.desc"),
       tableGet("events", "select=*"),
       tableGet("checklist", "select=*"),
       tableGet("requests", "select=*"),
+      optionalTableGet("notifications", "select=*&order=created_at.desc"),
     ]);
-  return { users, clients, projects, documents, timeline, events, checklist, requests };
+  return { users, clients, projects, documents, timeline, events, checklist, requests, notifications };
 }
 
 function createLocalStore(db) {
   return {
     async insert(table, row) {
+      if (!db[table]) db[table] = [];
       db[table].unshift(row);
       writeJsonDb(db);
       return row;
@@ -535,6 +590,16 @@ async function handleApi(req, res) {
       return;
     }
     const documentId = `doc-${Date.now()}`;
+    const parentDocumentId = fields.parentDocumentId || "";
+    const siblingVersions = db.documents.filter(
+      (document) =>
+        document.id === parentDocumentId ||
+        document.parentDocumentId === parentDocumentId ||
+        (!parentDocumentId && document.title === fields.title && document.projectId === fields.projectId),
+    );
+    const versionNumber = parentDocumentId
+      ? Math.max(1, ...siblingVersions.map((document) => Number(document.versionNumber || 1))) + 1
+      : Number(fields.versionNumber || 1);
     const safeFilename = file?.filename ? `${Date.now()}-${slug(file.filename)}${path.extname(file.filename)}` : "";
     const storageKey = file && useSupabase ? `projects/${fields.projectId}/${documentId}/${safeFilename}` : "";
     if (file && useSupabase) await store.upload(storageKey, file);
@@ -543,14 +608,29 @@ async function handleApi(req, res) {
       projectId: fields.projectId,
       title: fields.title,
       type: fields.type || file?.filename?.split(".").pop()?.toUpperCase() || "PDF",
-      version: fields.version || "v1.0",
+      version: fields.version || `v${versionNumber}.0`,
+      versionNumber,
       date: todayLabel(),
       visibility: fields.visibility || "Cliente",
+      category: fields.category || "Altro",
+      tags: fields.tags || "",
+      documentStatus: fields.documentStatus || "Pubblicato",
+      parentDocumentId,
       storageKey,
       fileName: file?.filename || "",
       mimeType: file?.contentType || "",
       fileSize: file?.buffer?.length || 0,
     });
+    if ((fields.visibility || "Cliente") === "Cliente") {
+      await queueNotification(store, db, {
+        projectId: fields.projectId,
+        notificationType: parentDocumentId ? "Nuova versione documento" : "Nuovo documento",
+        relatedType: "document",
+        relatedId: documentId,
+        subject: parentDocumentId ? "Nuova versione documento disponibile" : "Nuovo documento disponibile",
+        message: `${fields.title} e' disponibile nel portale clienti.`,
+      });
+    }
     sendJson(res, 201, { ok: true });
     return;
   }
@@ -612,13 +692,22 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "Progetto, titolo e testo richiesta sono obbligatori" });
       return;
     }
+    const requestId = `req-${Date.now()}`;
     await store.insert("requests", {
-      id: `req-${Date.now()}`,
+      id: requestId,
       projectId: payload.projectId,
       title: payload.title,
       body: payload.body,
       status: payload.status || "Aperta",
       dueDate: payload.dueDate || "Da definire",
+    });
+    await queueNotification(store, db, {
+      projectId: payload.projectId,
+      notificationType: "Nuova richiesta cliente",
+      relatedType: "request",
+      relatedId: requestId,
+      subject: "Nuova richiesta dallo studio",
+      message: `${payload.title}: ${payload.body}`,
     });
     sendJson(res, 201, { ok: true });
     return;
@@ -655,7 +744,7 @@ async function handleApi(req, res) {
 
 function serveStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
-  const requested = urlPath === "/" ? "/index.html" : urlPath;
+  const requested = urlPath === "/" || urlPath === "/demo" || urlPath === "/demo/" ? "/index.html" : urlPath;
   const filePath = path.normalize(path.join(root, requested));
   if (!filePath.startsWith(root)) {
     res.writeHead(403);
