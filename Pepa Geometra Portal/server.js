@@ -7,6 +7,11 @@ const root = __dirname;
 const dataPath = path.join(root, "data", "db.json");
 const sessions = new Map();
 
+const supabaseUrl = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const storageBucket = process.env.SUPABASE_STORAGE_BUCKET || "project-documents";
+const useSupabase = Boolean(supabaseUrl && supabaseKey);
+
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -15,11 +20,11 @@ const contentTypes = {
   ".md": "text/markdown; charset=utf-8",
 };
 
-function readDb() {
+function readJsonDb() {
   return JSON.parse(fs.readFileSync(dataPath, "utf8"));
 }
 
-function writeDb(db) {
+function writeJsonDb(db) {
   fs.writeFileSync(dataPath, `${JSON.stringify(db, null, 2)}\n`);
 }
 
@@ -65,7 +70,7 @@ function bodyJson(req) {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > 2_000_000) {
         req.destroy();
         reject(new Error("Payload troppo grande"));
       }
@@ -80,6 +85,80 @@ function bodyJson(req) {
   });
 }
 
+function readBodyBuffer(req, limit = 30_000_000) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        req.destroy();
+        reject(new Error("File troppo grande per questa beta"));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+  });
+}
+
+function splitBuffer(buffer, separator) {
+  const parts = [];
+  let start = 0;
+  let index = buffer.indexOf(separator, start);
+  while (index !== -1) {
+    parts.push(buffer.subarray(start, index));
+    start = index + separator.length;
+    index = buffer.indexOf(separator, start);
+  }
+  parts.push(buffer.subarray(start));
+  return parts;
+}
+
+async function bodyMultipart(req) {
+  const contentType = req.headers["content-type"] || "";
+  const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  if (!match) throw new Error("Formato upload non valido");
+
+  const boundary = Buffer.from(`--${match[1] || match[2]}`);
+  const raw = await readBodyBuffer(req);
+  const result = { fields: {}, file: null };
+
+  for (const chunk of splitBuffer(raw, boundary)) {
+    let part = chunk;
+    if (part.subarray(0, 2).toString() === "\r\n") part = part.subarray(2);
+    if (part.subarray(0, 2).toString() === "--") continue;
+    if (!part.length) continue;
+
+    const headerEnd = part.indexOf(Buffer.from("\r\n\r\n"));
+    if (headerEnd === -1) continue;
+    const headerText = part.subarray(0, headerEnd).toString("utf8");
+    let content = part.subarray(headerEnd + 4);
+    if (content.subarray(content.length - 2).toString() === "\r\n") {
+      content = content.subarray(0, content.length - 2);
+    }
+
+    const name = headerText.match(/name="([^"]+)"/)?.[1];
+    const filename = headerText.match(/filename="([^"]*)"/)?.[1];
+    const partType = headerText.match(/content-type:\s*([^\r\n]+)/i)?.[1] || "application/octet-stream";
+    if (!name) continue;
+
+    if (filename) {
+      result.file = {
+        fieldName: name,
+        filename,
+        contentType: partType,
+        buffer: content,
+      };
+    } else {
+      result.fields[name] = content.toString("utf8");
+    }
+  }
+
+  return result;
+}
+
 function slug(value) {
   return String(value)
     .toLowerCase()
@@ -91,7 +170,15 @@ function slug(value) {
 }
 
 function todayLabel() {
-  return "05 Mag 2026";
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Europe/Rome",
+  })
+    .format(new Date())
+    .replace(".", "")
+    .replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 function clientVisibleDb(db, user) {
@@ -113,8 +200,208 @@ function clientVisibleDb(db, user) {
   };
 }
 
+function toSnake(value) {
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, fieldValue]) => fieldValue !== undefined)
+      .map(([key, fieldValue]) => [
+        key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`),
+        fieldValue,
+      ]),
+  );
+}
+
+function fromSnake(row) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    username: row.username,
+    password: row.password,
+    name: row.name,
+    role: row.role,
+    email: row.email,
+    phone: row.phone,
+    clientId: row.client_id,
+    projectId: row.project_id,
+    title: row.title,
+    client: row.client,
+    address: row.address,
+    status: row.status,
+    phase: row.phase,
+    updatedAt: row.updated_at,
+    description: row.description,
+    progress: row.progress,
+    nextAction: row.next_action,
+    nextActionOwner: row.next_action_owner,
+    nextActionDue: row.next_action_due,
+    type: row.type,
+    version: row.version,
+    date: row.date,
+    visibility: row.visibility,
+    storageKey: row.storage_key,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    fileSize: row.file_size,
+    body: row.body,
+    day: row.day,
+    month: row.month,
+    note: row.note,
+    label: row.label,
+    dueDate: row.due_date,
+  };
+}
+
+async function supabaseFetch(pathname, options = {}) {
+  const response = await fetch(`${supabaseUrl}${pathname}`, {
+    ...options,
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      ...(options.headers || {}),
+    },
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    throw new Error(payload?.message || payload?.error || "Errore Supabase");
+  }
+  return payload;
+}
+
+async function tableGet(table, query = "select=*") {
+  const rows = await supabaseFetch(`/rest/v1/${table}?${query}`, {
+    headers: { Accept: "application/json" },
+  });
+  return rows.map(fromSnake);
+}
+
+async function tableInsert(table, row) {
+  const rows = await supabaseFetch(`/rest/v1/${table}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(toSnake(row)),
+  });
+  return fromSnake(rows[0]);
+}
+
+async function tableUpdate(table, id, row) {
+  const rows = await supabaseFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(toSnake(row)),
+  });
+  return fromSnake(rows[0]);
+}
+
+async function storageUpload(storageKey, file) {
+  if (!file || !file.buffer?.length) return null;
+  await supabaseFetch(
+    `/storage/v1/object/${encodeURIComponent(storageBucket)}/${storageKey
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": file.contentType,
+        "Cache-Control": "3600",
+        "x-upsert": "false",
+      },
+      body: file.buffer,
+    },
+  );
+  return storageKey;
+}
+
+async function storageSignedUrl(storageKey) {
+  const payload = await supabaseFetch(
+    `/storage/v1/object/sign/${encodeURIComponent(storageBucket)}/${storageKey
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expiresIn: 120 }),
+    },
+  );
+  if (!payload?.signedURL) throw new Error("Link documento non disponibile");
+  return payload.signedURL.startsWith("http") ? payload.signedURL : `${supabaseUrl}${payload.signedURL}`;
+}
+
+async function readDb() {
+  if (!useSupabase) return readJsonDb();
+  const [users, clients, projects, documents, timeline, events, checklist, requests] =
+    await Promise.all([
+      tableGet("users", "select=*"),
+      tableGet("clients", "select=*"),
+      tableGet("projects", "select=*&order=updated_at.desc"),
+      tableGet("documents", "select=*&order=date.desc"),
+      tableGet("timeline", "select=*&order=date.desc"),
+      tableGet("events", "select=*"),
+      tableGet("checklist", "select=*"),
+      tableGet("requests", "select=*"),
+    ]);
+  return { users, clients, projects, documents, timeline, events, checklist, requests };
+}
+
+function createLocalStore(db) {
+  return {
+    async insert(table, row) {
+      db[table].unshift(row);
+      writeJsonDb(db);
+      return row;
+    },
+    async update(table, id, row) {
+      const record = db[table].find((item) => item.id === id);
+      if (!record) return null;
+      Object.assign(record, row);
+      writeJsonDb(db);
+      return record;
+    },
+    async upload() {
+      return null;
+    },
+    async signedUrl() {
+      return null;
+    },
+  };
+}
+
+function createStore(db) {
+  if (!useSupabase) return createLocalStore(db);
+  return {
+    insert: tableInsert,
+    update: tableUpdate,
+    upload: storageUpload,
+    signedUrl: storageSignedUrl,
+  };
+}
+
+function canAccessDocument(user, db, document) {
+  if (!document) return false;
+  if (isAdmin(user)) return true;
+  if (document.visibility !== "Cliente") return false;
+  return db.projects.some(
+    (project) => project.id === document.projectId && project.clientId === user.clientId,
+  );
+}
+
+async function documentPayload(req) {
+  const type = req.headers["content-type"] || "";
+  if (!type.startsWith("multipart/form-data")) return { fields: await bodyJson(req), file: null };
+  return bodyMultipart(req);
+}
+
 async function handleApi(req, res) {
-  const db = readDb();
+  const db = await readDb();
+  const store = createStore(db);
   const user = currentUser(req);
   const url = new URL(req.url, "http://localhost");
 
@@ -146,7 +433,7 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/health") {
-    sendJson(res, 200, { ok: true });
+    sendJson(res, 200, { ok: true, storage: useSupabase ? "supabase" : "json" });
     return;
   }
 
@@ -162,6 +449,23 @@ async function handleApi(req, res) {
 
   if (req.method === "GET" && url.pathname === "/api/bootstrap") {
     sendJson(res, 200, { user: publicUser(user), data: clientVisibleDb(db, user) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/api/documents/")) {
+    const documentId = decodeURIComponent(url.pathname.replace("/api/documents/", "").replace("/download", ""));
+    const document = db.documents.find((item) => item.id === documentId);
+    if (!canAccessDocument(user, db, document)) {
+      sendJson(res, 404, { error: "Documento non disponibile" });
+      return;
+    }
+    if (!document.storageKey) {
+      sendJson(res, 404, { error: "File non ancora caricato per questo documento" });
+      return;
+    }
+    const signedUrl = await store.signedUrl(document.storageKey);
+    res.writeHead(302, { Location: signedUrl });
+    res.end();
     return;
   }
 
@@ -181,7 +485,7 @@ async function handleApi(req, res) {
     const id = db.projects.some((project) => project.id === idBase)
       ? `${idBase}-${Date.now()}`
       : idBase;
-    db.projects.unshift({
+    await store.insert("projects", {
       id,
       clientId: client.id,
       title: payload.title,
@@ -196,50 +500,57 @@ async function handleApi(req, res) {
       nextActionOwner: payload.nextActionOwner || "Studio",
       nextActionDue: payload.nextActionDue || "Da definire",
     });
-    writeDb(db);
     sendJson(res, 201, { ok: true, id });
     return;
   }
 
   if (req.method === "PATCH" && url.pathname.startsWith("/api/projects/")) {
     const projectId = decodeURIComponent(url.pathname.replace("/api/projects/", ""));
-    const payload = await bodyJson(req);
     const project = db.projects.find((item) => item.id === projectId);
     if (!project) {
       sendJson(res, 404, { error: "Progetto non trovato" });
       return;
     }
-    project.title = payload.title || project.title;
-    project.address = payload.address || project.address;
-    project.status = payload.status || project.status;
-    project.phase = payload.phase || project.phase;
-    project.description = payload.description || project.description;
-    project.progress = Number(payload.progress ?? project.progress);
-    project.nextAction = payload.nextAction || project.nextAction;
-    project.nextActionOwner = payload.nextActionOwner || project.nextActionOwner;
-    project.nextActionDue = payload.nextActionDue || project.nextActionDue;
-    project.updatedAt = todayLabel();
-    writeDb(db);
+    const payload = await bodyJson(req);
+    await store.update("projects", projectId, {
+      title: payload.title || project.title,
+      address: payload.address || project.address,
+      status: payload.status || project.status,
+      phase: payload.phase || project.phase,
+      description: payload.description || project.description,
+      progress: Number(payload.progress ?? project.progress),
+      nextAction: payload.nextAction || project.nextAction,
+      nextActionOwner: payload.nextActionOwner || project.nextActionOwner,
+      nextActionDue: payload.nextActionDue || project.nextActionDue,
+      updatedAt: todayLabel(),
+    });
     sendJson(res, 200, { ok: true });
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/documents") {
-    const payload = await bodyJson(req);
-    if (!payload.projectId || !payload.title) {
+    const { fields, file } = await documentPayload(req);
+    if (!fields.projectId || !fields.title) {
       sendJson(res, 400, { error: "Progetto e nome documento sono obbligatori" });
       return;
     }
-    db.documents.unshift({
-      id: `doc-${Date.now()}`,
-      projectId: payload.projectId,
-      title: payload.title,
-      type: payload.type || "PDF",
-      version: payload.version || "v1.0",
+    const documentId = `doc-${Date.now()}`;
+    const safeFilename = file?.filename ? `${Date.now()}-${slug(file.filename)}${path.extname(file.filename)}` : "";
+    const storageKey = file && useSupabase ? `projects/${fields.projectId}/${documentId}/${safeFilename}` : "";
+    if (file && useSupabase) await store.upload(storageKey, file);
+    await store.insert("documents", {
+      id: documentId,
+      projectId: fields.projectId,
+      title: fields.title,
+      type: fields.type || file?.filename?.split(".").pop()?.toUpperCase() || "PDF",
+      version: fields.version || "v1.0",
       date: todayLabel(),
-      visibility: payload.visibility || "Cliente",
+      visibility: fields.visibility || "Cliente",
+      storageKey,
+      fileName: file?.filename || "",
+      mimeType: file?.contentType || "",
+      fileSize: file?.buffer?.length || 0,
     });
-    writeDb(db);
     sendJson(res, 201, { ok: true });
     return;
   }
@@ -250,14 +561,13 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "Progetto, titolo e testo sono obbligatori" });
       return;
     }
-    db.timeline.unshift({
+    await store.insert("timeline", {
       id: `time-${Date.now()}`,
       projectId: payload.projectId,
       date: todayLabel(),
       title: payload.title,
       body: payload.body,
     });
-    writeDb(db);
     sendJson(res, 201, { ok: true });
     return;
   }
@@ -268,7 +578,7 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "Progetto, giorno, mese e titolo sono obbligatori" });
       return;
     }
-    db.events.unshift({
+    await store.insert("events", {
       id: `event-${Date.now()}`,
       projectId: payload.projectId,
       day: payload.day,
@@ -276,7 +586,6 @@ async function handleApi(req, res) {
       title: payload.title,
       note: payload.note || "",
     });
-    writeDb(db);
     sendJson(res, 201, { ok: true });
     return;
   }
@@ -287,13 +596,12 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "Progetto e voce checklist sono obbligatori" });
       return;
     }
-    db.checklist.unshift({
+    await store.insert("checklist", {
       id: `check-${Date.now()}`,
       projectId: payload.projectId,
       label: payload.label,
       status: payload.status || "Da fare",
     });
-    writeDb(db);
     sendJson(res, 201, { ok: true });
     return;
   }
@@ -304,7 +612,7 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "Progetto, titolo e testo richiesta sono obbligatori" });
       return;
     }
-    db.requests.unshift({
+    await store.insert("requests", {
       id: `req-${Date.now()}`,
       projectId: payload.projectId,
       title: payload.title,
@@ -312,7 +620,6 @@ async function handleApi(req, res) {
       status: payload.status || "Aperta",
       dueDate: payload.dueDate || "Da definire",
     });
-    writeDb(db);
     sendJson(res, 201, { ok: true });
     return;
   }
@@ -324,13 +631,13 @@ async function handleApi(req, res) {
       return;
     }
     const id = `cliente-${slug(payload.name)}-${Date.now()}`;
-    db.clients.unshift({
+    await store.insert("clients", {
       id,
       name: payload.name,
       email: payload.email,
       phone: payload.phone || "",
     });
-    db.users.push({
+    await store.insert("users", {
       id: `user-${slug(payload.username)}-${Date.now()}`,
       username: payload.username,
       password: payload.password,
@@ -339,7 +646,6 @@ async function handleApi(req, res) {
       email: payload.email,
       clientId: id,
     });
-    writeDb(db);
     sendJson(res, 201, { ok: true, id });
     return;
   }
@@ -383,5 +689,7 @@ const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || "0.0.0.0";
 server.listen(port, host, () => {
   const visibleHost = host === "0.0.0.0" ? "127.0.0.1" : host;
-  console.log(`Studio Clementi Portal: http://${visibleHost}:${port}`);
+  console.log(
+    `Studio Clementi Portal: http://${visibleHost}:${port} (${useSupabase ? "Supabase" : "JSON locale"})`,
+  );
 });

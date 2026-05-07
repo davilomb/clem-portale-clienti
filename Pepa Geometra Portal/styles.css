@@ -178,6 +178,12 @@ button {
   background: #f7fafc;
 }
 
+.button.disabled {
+  cursor: default;
+  opacity: 0.62;
+  pointer-events: none;
+}
+
 .button.ghost {
   color: var(--brand);
   background: transparent;

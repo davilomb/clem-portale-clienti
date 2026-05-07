@@ -26,6 +26,7 @@ Profili demo:
 - Login locale con sessione.
 - Backend locale in Node.js.
 - Dati salvati in `data/db.json`.
+- Supporto opzionale a Supabase per database online e documenti.
 - Dashboard geometra.
 - Area cliente in sola lettura.
 - Progetti gestiti solo dal geometra.
@@ -38,15 +39,90 @@ Profili demo:
 - Checklist progetto.
 - Richieste al cliente in sola lettura lato cliente.
 
+## Database e documenti online con Supabase
+
+La app funziona in due modalita':
+
+- senza variabili Supabase: usa `data/db.json`, utile per sviluppo locale;
+- con variabili Supabase: usa database PostgreSQL e Storage Supabase.
+
+### 1. Crea progetto Supabase
+
+1. Vai su `https://supabase.com`.
+2. Crea un nuovo progetto.
+3. Scegli una password database e conservala.
+4. Aspetta che il progetto sia pronto.
+
+### 2. Crea tabelle e bucket
+
+1. Apri il progetto Supabase.
+2. Vai su `SQL Editor`.
+3. Crea una nuova query.
+4. Copia tutto il contenuto di `supabase/schema.sql`.
+5. Esegui la query.
+
+Questo crea:
+
+- tabelle clienti, utenti, progetti, documenti, timeline, scadenze, checklist e richieste;
+- bucket privato `project-documents`;
+- dati demo iniziali.
+
+### 3. Recupera le chiavi Supabase
+
+Nel progetto Supabase vai su:
+
+```txt
+Project Settings -> API
+```
+
+Recupera:
+
+- Project URL;
+- service_role key.
+
+Attenzione: la `service_role key` e' segreta. Non va pubblicata su GitHub.
+
+### 4. Configura Render
+
+Nel servizio Render vai su:
+
+```txt
+Environment
+```
+
+Aggiungi:
+
+```txt
+SUPABASE_URL=https://xxxxxxxxxxxxxxxxxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=la-tua-service-role-key
+SUPABASE_STORAGE_BUCKET=project-documents
+```
+
+Poi fai:
+
+```txt
+Manual Deploy -> Deploy latest commit
+```
+
+### 5. Upload documenti
+
+Quando Supabase e' attivo:
+
+- il geometra puo' caricare un file dal modulo documento;
+- il file viene salvato nel bucket privato `project-documents`;
+- nel database viene salvata solo la scheda documento;
+- il cliente puo' aprire solo documenti visibili al cliente e relativi ai propri progetti.
+
+In locale, senza Supabase, il portale continua a salvare solo i metadati documento in `db.json`.
+
 ## Prossimi passaggi tecnici
 
-1. Convertire il prototipo in una web app con backend reale.
-2. Sostituire `data/db.json` con PostgreSQL.
-3. Aggiungere password cifrate.
-4. Aggiungere upload reale dei documenti in storage privato.
-5. Aggiungere download protetto dei file.
-6. Aggiungere versionamento documenti.
-7. Preparare Docker Compose per sviluppo locale e poi deploy.
+1. Aggiungere password cifrate.
+2. Aggiungere invito email cliente.
+3. Aggiungere versionamento documenti.
+4. Aggiungere log accessi e download.
+5. Aggiungere notifiche email.
+6. Preparare backup e procedure GDPR.
 
 ## Stack consigliato per la fase successiva
 

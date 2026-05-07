@@ -46,8 +46,12 @@ function wait(ms) {
 }
 
 async function api(path, options = {}, retries = 2) {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(options.headers || {}),
+    },
     credentials: "same-origin",
     ...options,
   });
@@ -267,9 +271,13 @@ function documentRows(documents) {
         <span>
           <span class="doc-type">${escapeHtml(doc.type)}</span>
           <strong>${escapeHtml(doc.title)}</strong>
-          <span class="doc-meta">${escapeHtml(doc.version)} · ${escapeHtml(doc.date)} · visibilita': ${escapeHtml(doc.visibility)}</span>
+          <span class="doc-meta">${escapeHtml(doc.version)} · ${escapeHtml(doc.date)} · visibilita': ${escapeHtml(doc.visibility)}${doc.fileName ? ` · file: ${escapeHtml(doc.fileName)}` : ""}</span>
         </span>
-        <button class="button secondary" type="button">Apri</button>
+        ${
+          doc.storageKey
+            ? `<a class="button secondary" href="/api/documents/${encodeURIComponent(doc.id)}/download" target="_blank" rel="noreferrer">Apri</a>`
+            : `<span class="button secondary disabled">Solo scheda</span>`
+        }
       </div>
     `,
     )
@@ -561,6 +569,7 @@ function adminProjectDetail() {
               <form class="panel-body form-grid" data-form="document">
                 <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
                 <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
+                <div class="field wide"><label>File</label><input name="file" type="file" /></div>
                 <div class="field"><label>Tipo</label><input name="type" value="PDF" /></div>
                 <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
                 <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
@@ -655,6 +664,7 @@ function adminDocuments() {
               <form class="panel-body form-grid" data-form="document">
                 <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
                 <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
+                <div class="field wide"><label>File</label><input name="file" type="file" /></div>
                 <div class="field"><label>Tipo</label><input name="type" value="PDF" /></div>
                 <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
                 <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
@@ -904,6 +914,11 @@ function bindAdminForms() {
           await api(`/api/projects/${encodeURIComponent(form.dataset.projectId)}`, {
             method: "PATCH",
             body: JSON.stringify(formValues(form)),
+          });
+        } else if (type === "document") {
+          await api(endpoints[type], {
+            method: "POST",
+            body: new FormData(form),
           });
         } else {
           await api(endpoints[type], {
