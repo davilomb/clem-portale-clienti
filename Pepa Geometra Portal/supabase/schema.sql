@@ -39,10 +39,29 @@ create table if not exists public.documents (
   version text default 'v1.0',
   date text default '',
   visibility text not null default 'Cliente' check (visibility in ('Cliente', 'Interno')),
+  category text default 'Altro',
+  tags text default '',
+  document_status text default 'Pubblicato',
+  parent_document_id text default '',
+  version_number integer default 1,
   storage_key text default '',
   file_name text default '',
   mime_type text default '',
   file_size integer default 0
+);
+
+create table if not exists public.notifications (
+  id text primary key,
+  project_id text not null references public.projects(id) on delete cascade,
+  recipient_email text not null,
+  notification_type text not null,
+  related_type text not null,
+  related_id text not null,
+  subject text not null,
+  message text not null,
+  status text not null default 'Da inviare',
+  created_at text default '',
+  sent_at text default ''
 );
 
 create table if not exists public.timeline (
@@ -145,12 +164,13 @@ insert into public.projects (
 on conflict (id) do nothing;
 
 insert into public.documents (
-  id, project_id, title, type, version, date, visibility, storage_key, file_name, mime_type, file_size
+  id, project_id, title, type, version, date, visibility, category, tags,
+  document_status, parent_document_id, version_number, storage_key, file_name, mime_type, file_size
 ) values
-  ('doc-relazione-bianchi', 'villa-bianchi', 'Relazione tecnica preliminare', 'PDF', 'v1.2', '02 Mag 2026', 'Cliente', '', '', '', 0),
-  ('doc-planimetria-bianchi', 'villa-bianchi', 'Planimetria stato di fatto', 'DWG', 'v1.0', '27 Apr 2026', 'Cliente', '', '', '', 0),
-  ('doc-preventivo-bianchi', 'villa-bianchi', 'Preventivo opere tecniche', 'PDF', 'v1.1', '21 Apr 2026', 'Interno', '', '', '', 0),
-  ('doc-integrazione-verdi', 'negozio-verdi', 'Richiesta integrazione documenti', 'PDF', 'v1.0', '29 Apr 2026', 'Cliente', '', '', '', 0)
+  ('doc-relazione-bianchi', 'villa-bianchi', 'Relazione tecnica preliminare', 'PDF', 'v1.2', '02 Mag 2026', 'Cliente', 'Relazione tecnica', 'comune, preliminare', 'Pubblicato', '', 1, '', '', '', 0),
+  ('doc-planimetria-bianchi', 'villa-bianchi', 'Planimetria stato di fatto', 'DWG', 'v1.0', '27 Apr 2026', 'Cliente', 'Planimetria', '', 'Pubblicato', '', 1, '', '', '', 0),
+  ('doc-preventivo-bianchi', 'villa-bianchi', 'Preventivo opere tecniche', 'PDF', 'v1.1', '21 Apr 2026', 'Interno', 'Preventivo', '', 'Pubblicato', '', 1, '', '', '', 0),
+  ('doc-integrazione-verdi', 'negozio-verdi', 'Richiesta integrazione documenti', 'PDF', 'v1.0', '29 Apr 2026', 'Cliente', 'Autorizzazione', '', 'Pubblicato', '', 1, '', '', '', 0)
 on conflict (id) do nothing;
 
 insert into public.timeline (id, project_id, date, title, body) values

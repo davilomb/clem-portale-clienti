@@ -112,8 +112,29 @@ Quando Supabase e' attivo:
 - il file viene salvato nel bucket privato `project-documents`;
 - nel database viene salvata solo la scheda documento;
 - il cliente puo' aprire solo documenti visibili al cliente e relativi ai propri progetti.
+- ogni documento puo' avere categoria, tag, stato e versioni;
+- quando viene pubblicato un documento visibile al cliente viene creata una notifica email in coda.
 
 In locale, senza Supabase, il portale continua a salvare solo i metadati documento in `db.json`.
+
+## Upgrade gestione documentale
+
+Se il database Supabase esiste gia', prima del deploy della nuova versione esegui nel `SQL Editor`:
+
+```txt
+supabase/upgrade_document_management.sql
+```
+
+Questo aggiunge:
+
+- categoria documento;
+- tag;
+- stato documento;
+- relazione tra versioni;
+- numero versione;
+- tabella `notifications` per preparare notifiche email.
+
+Le notifiche sono per ora accodate nel database. L'invio reale via email richiedera' un provider come Resend, SendGrid o Brevo.
 
 ## Prossimi passaggi tecnici
 

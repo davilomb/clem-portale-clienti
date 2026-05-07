@@ -12,6 +12,7 @@ const state = {
     events: [],
     checklist: [],
     requests: [],
+    notifications: [],
   },
 };
 
@@ -269,9 +270,19 @@ function documentRows(documents) {
       (doc) => `
       <div class="row-item">
         <span>
-          <span class="doc-type">${escapeHtml(doc.type)}</span>
+          <span class="doc-type">${escapeHtml(doc.category || doc.type)}</span>
           <strong>${escapeHtml(doc.title)}</strong>
-          <span class="doc-meta">${escapeHtml(doc.version)} · ${escapeHtml(doc.date)} · visibilita': ${escapeHtml(doc.visibility)}${doc.fileName ? ` · file: ${escapeHtml(doc.fileName)}` : ""}</span>
+          <span class="doc-meta">
+            ${escapeHtml(doc.version)} · ${escapeHtml(doc.documentStatus || "Pubblicato")} · ${escapeHtml(doc.date)} · visibilita': ${escapeHtml(doc.visibility)}${doc.fileName ? ` · file: ${escapeHtml(doc.fileName)}` : ""}
+          </span>
+          ${
+            doc.tags
+              ? `<span class="tag-list">${doc.tags
+                  .split(",")
+                  .map((tag) => `<span>${escapeHtml(tag.trim())}</span>`)
+                  .join("")}</span>`
+              : ""
+          }
         </span>
         ${
           doc.storageKey
@@ -282,6 +293,16 @@ function documentRows(documents) {
     `,
     )
     .join("");
+}
+
+function documentVersionOptions(projectId) {
+  const docs = state.data.documents.filter((doc) => doc.projectId === projectId);
+  return `
+    <option value="">Nuovo documento</option>
+    ${docs
+      .map((doc) => `<option value="${escapeHtml(doc.parentDocumentId || doc.id)}">${escapeHtml(doc.title)} (${escapeHtml(doc.version)})</option>`)
+      .join("")}
+  `;
 }
 
 function timelineRows(projectId) {
@@ -364,6 +385,25 @@ function requestRows(projectId) {
     .join("");
 }
 
+function notificationRows() {
+  const items = state.data.notifications || [];
+  if (!items.length) return `<div class="empty-state">Nessuna notifica in coda.</div>`;
+  return items
+    .slice(0, 6)
+    .map(
+      (item) => `
+      <div class="row-item">
+        <span>
+          <strong>${escapeHtml(item.subject)}</strong>
+          <span>${escapeHtml(item.recipientEmail)} · ${escapeHtml(item.notificationType)} · ${escapeHtml(item.status)}</span>
+        </span>
+        <span class="status waiting">Email</span>
+      </div>
+    `,
+    )
+    .join("");
+}
+
 function adminOverview() {
   const openProjects = state.data.projects.filter((project) => project.status !== "Completato").length;
   const visibleDocs = state.data.documents.filter((doc) => doc.visibility === "Cliente").length;
@@ -390,6 +430,11 @@ function adminOverview() {
         <div class="panel-body event-list">${eventRows()}</div>
       </section>
     </div>
+    <br />
+    <section class="panel">
+      <div class="panel-header"><h2>Notifiche email in coda</h2></div>
+      <div class="panel-body client-list">${notificationRows()}</div>
+    </section>
   `;
 }
 
@@ -568,10 +613,14 @@ function adminProjectDetail() {
               <div class="panel-header"><h2>Aggiungi documento</h2><span class="edit-pill">Gestione</span></div>
               <form class="panel-body form-grid" data-form="document">
                 <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+                <div class="field wide"><label>Nuova versione di</label><select name="parentDocumentId">${documentVersionOptions(project.id)}</select></div>
                 <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
                 <div class="field wide"><label>File</label><input name="file" type="file" /></div>
-                <div class="field"><label>Tipo</label><input name="type" value="PDF" /></div>
+                <div class="field"><label>Formato</label><input name="type" value="PDF" /></div>
+                <div class="field"><label>Categoria</label><select name="category"><option>Planimetria</option><option>Autorizzazione</option><option>Pratica pompieri</option><option>Relazione tecnica</option><option>Catastale</option><option>Preventivo</option><option>Altro</option></select></div>
                 <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
+                <div class="field"><label>Stato</label><select name="documentStatus"><option>Pubblicato</option><option>Bozza</option><option>In revisione</option><option>Approvato</option><option>Archiviato</option></select></div>
+                <div class="field wide"><label>Tag</label><input name="tags" placeholder="es. comune, antincendio, definitivo" /></div>
                 <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
                 <button class="button wide" type="submit">Registra documento</button>
               </form>
@@ -663,10 +712,14 @@ function adminDocuments() {
               <div class="panel-header"><h2>Nuovo documento</h2><span class="edit-pill">Gestione</span></div>
               <form class="panel-body form-grid" data-form="document">
                 <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
+                <div class="field wide"><label>Nuova versione di</label><select name="parentDocumentId">${documentVersionOptions(state.selectedProjectId)}</select></div>
                 <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
                 <div class="field wide"><label>File</label><input name="file" type="file" /></div>
-                <div class="field"><label>Tipo</label><input name="type" value="PDF" /></div>
+                <div class="field"><label>Formato</label><input name="type" value="PDF" /></div>
+                <div class="field"><label>Categoria</label><select name="category"><option>Planimetria</option><option>Autorizzazione</option><option>Pratica pompieri</option><option>Relazione tecnica</option><option>Catastale</option><option>Preventivo</option><option>Altro</option></select></div>
                 <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
+                <div class="field"><label>Stato</label><select name="documentStatus"><option>Pubblicato</option><option>Bozza</option><option>In revisione</option><option>Approvato</option><option>Archiviato</option></select></div>
+                <div class="field wide"><label>Tag</label><input name="tags" placeholder="es. comune, antincendio, definitivo" /></div>
                 <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
                 <button class="button wide" type="submit">Registra documento</button>
               </form>

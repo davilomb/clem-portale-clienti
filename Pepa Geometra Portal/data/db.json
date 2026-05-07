@@ -93,7 +93,12 @@
       "type": "PDF",
       "version": "v1.2",
       "date": "02 Mag 2026",
-      "visibility": "Cliente"
+      "visibility": "Cliente",
+      "category": "Relazione tecnica",
+      "tags": "comune, preliminare",
+      "documentStatus": "Pubblicato",
+      "parentDocumentId": "",
+      "versionNumber": 1
     },
     {
       "id": "doc-planimetria-bianchi",
@@ -102,7 +107,12 @@
       "type": "DWG",
       "version": "v1.0",
       "date": "27 Apr 2026",
-      "visibility": "Cliente"
+      "visibility": "Cliente",
+      "category": "Planimetria",
+      "tags": "",
+      "documentStatus": "Pubblicato",
+      "parentDocumentId": "",
+      "versionNumber": 1
     },
     {
       "id": "doc-preventivo-bianchi",
@@ -111,7 +121,12 @@
       "type": "PDF",
       "version": "v1.1",
       "date": "21 Apr 2026",
-      "visibility": "Interno"
+      "visibility": "Interno",
+      "category": "Preventivo",
+      "tags": "",
+      "documentStatus": "Pubblicato",
+      "parentDocumentId": "",
+      "versionNumber": 1
     },
     {
       "id": "doc-integrazione-verdi",
@@ -120,7 +135,12 @@
       "type": "PDF",
       "version": "v1.0",
       "date": "29 Apr 2026",
-      "visibility": "Cliente"
+      "visibility": "Cliente",
+      "category": "Relazione tecnica",
+      "tags": "",
+      "documentStatus": "Pubblicato",
+      "parentDocumentId": "",
+      "versionNumber": 1
     }
   ],
   "timeline": [
@@ -240,5 +260,6 @@
       "status": "In attesa cliente",
       "dueDate": "09 Mag 2026"
     }
-  ]
+  ],
+  "notifications": []
 }

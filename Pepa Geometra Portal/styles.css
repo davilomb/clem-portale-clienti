@@ -634,6 +634,22 @@ button {
   font-size: 13px;
 }
 
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.tag-list span {
+  border-radius: 999px;
+  background: #edf7f6;
+  color: var(--brand-dark);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .next-action {
   display: grid;
   gap: 12px;
