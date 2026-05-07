@@ -332,7 +332,10 @@ async function storageSignedUrl(storageKey) {
     },
   );
   if (!payload?.signedURL) throw new Error("Link documento non disponibile");
-  return payload.signedURL.startsWith("http") ? payload.signedURL : `${supabaseUrl}${payload.signedURL}`;
+  if (payload.signedURL.startsWith("http")) return payload.signedURL;
+  if (payload.signedURL.startsWith("/storage/v1/")) return `${supabaseUrl}${payload.signedURL}`;
+  if (payload.signedURL.startsWith("/object/")) return `${supabaseUrl}/storage/v1${payload.signedURL}`;
+  return `${supabaseUrl}/storage/v1/${payload.signedURL.replace(/^\/+/, "")}`;
 }
 
 async function readDb() {
