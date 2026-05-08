@@ -1,6 +1,7 @@
 const app = document.querySelector("#app");
 const demoParams = new URLSearchParams(window.location.search);
 const isDemoMode = window.location.pathname.replace(/\/$/, "") === "/demo" || demoParams.get("demo") === "1";
+const renderDemoUrl = "https://studio-clementi-portale-clienti.onrender.com";
 
 const state = {
   user: null,
@@ -49,6 +50,8 @@ function wait(ms) {
 }
 
 function demoUrl(route = "") {
+  const isLocalPreview = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  if (!isLocalPreview) return renderDemoUrl;
   const suffix = route ? `?view=${encodeURIComponent(route)}` : "";
   return `/demo${suffix}`;
 }
