@@ -1,4 +1,7 @@
 const app = document.querySelector("#app");
+const demoParams = new URLSearchParams(window.location.search);
+const isDemoMode = window.location.pathname.replace(/\/$/, "") === "/demo" || demoParams.get("demo") === "1";
+const renderDemoUrl = "https://inbolla.onrender.com/demo";
 
 const state = {
   user: null,
@@ -44,6 +47,226 @@ function escapeHtml(value) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function demoUrl(route = "") {
+  const isLocalPreview = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  if (!isLocalPreview) return renderDemoUrl;
+  const suffix = route ? `?view=${encodeURIComponent(route)}` : "";
+  return `/demo${suffix}`;
+}
+
+function renderLanding() {
+  app.className = "landing-shell";
+  app.innerHTML = `
+    <header class="site-header">
+      <a class="site-logo" href="/">
+        <img src="./assets/brand/inbolla-logo-full.png" alt="InBolla" />
+      </a>
+      <nav class="site-nav" aria-label="Navigazione principale">
+        <a href="#come-funziona">Come funziona</a>
+        <a href="#funzioni">Funzioni</a>
+        <a href="#faq">FAQ</a>
+        <a href="#contatti">Contatti</a>
+      </nav>
+      <div class="site-actions">
+        <a class="button secondary" href="#contatti">Contattaci</a>
+        <a class="button" href="${demoUrl()}">Demo</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Portale cliente per studi tecnici</span>
+        <h1>Il cliente vede tutto chiaro. Il geometra lavora meglio.</h1>
+        <p>
+          InBolla trasforma la gestione della pratica in un’esperienza ordinata:
+          documenti, scadenze e aggiornamenti sempre a portata di cliente.
+        </p>
+        <div class="hero-actions">
+          <a class="button large" href="#contatti">Contattaci</a>
+          <a class="button large secondary" href="${demoUrl()}">Guarda la demo</a>
+        </div>
+      </div>
+      <div class="hero-product" aria-label="Anteprima piattaforma InBolla">
+        <img class="mascot" src="./assets/brand/inbolla-mascot.png" alt="" />
+        <div class="product-window">
+          <div class="window-bar"><span></span><span></span><span></span></div>
+          <div class="product-grid">
+            <div>
+              <small>Prossima azione</small>
+              <strong>Attesa protocollo comunale</strong>
+              <p>Scadenza: 07 Mag 2026</p>
+            </div>
+            <div>
+              <small>Documenti condivisi</small>
+              <strong>12</strong>
+              <p>Versioni e allegati ordinati</p>
+            </div>
+            <div>
+              <small>Avanzamento pratica</small>
+              <strong>62%</strong>
+              <p>Fase: pratica edilizia</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="statement-band">
+      <article>
+        <span>Per lo studio</span>
+        <h2>Pratiche ordinate. Informazioni sempre aggiornate.</h2>
+      </article>
+      <article>
+        <span>Per il cliente</span>
+        <h2>Tutto è chiaro: date, documenti, richieste e prossimi passi.</h2>
+      </article>
+    </section>
+
+    <section class="steps-section" id="come-funziona">
+      <div class="section-title centered">
+        <span class="eyebrow">Come funziona</span>
+        <h2>Tre passaggi semplici.</h2>
+      </div>
+      <div class="steps-grid">
+        <article>
+          <span>1</span>
+          <h3>Organizzi la pratica</h3>
+          <p>Stato, fase, documenti e scadenze sono raccolti in un unico spazio.</p>
+        </article>
+        <article>
+          <span>2</span>
+          <h3>Condividi ciò che serve</h3>
+          <p>Il cliente vede solo le informazioni utili, sempre ordinate e aggiornate.</p>
+        </article>
+        <article>
+          <span>3</span>
+          <h3>Riduci la confusione</h3>
+          <p>Meno telefonate ripetitive, meno documenti dispersi, più fiducia.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="screens-section" id="funzioni">
+      <div class="section-title centered">
+        <span class="eyebrow">Funzioni principali</span>
+        <h2>Prima chiarezza per il cliente. Poi controllo per lo studio.</h2>
+      </div>
+      <div class="feature-showcase">
+        <article class="showcase-row">
+          <img src="./assets/screenshots/demo-cliente.png" alt="Area cliente InBolla" />
+          <div>
+            <span class="eyebrow">Valore cliente</span>
+            <h3>Il cliente entra e capisce subito.</h3>
+            <p>Vede cosa è successo, cosa manca, quali documenti sono disponibili e quali scadenze deve ricordare.</p>
+          </div>
+        </article>
+        <article class="showcase-row reverse">
+          <img src="./assets/screenshots/demo-cruscotto.png" alt="Cruscotto studio InBolla" />
+          <div>
+            <span class="eyebrow">Back office</span>
+            <h3>Lo studio mantiene tutto allineato.</h3>
+            <p>Il geometra aggiorna pratiche, documenti e scadenze da un punto unico, senza disperdere informazioni.</p>
+          </div>
+        </article>
+        <article class="showcase-row">
+          <img src="./assets/screenshots/demo-pratica.png" alt="Gestione pratica InBolla" />
+          <div>
+            <span class="eyebrow">Pratica</span>
+            <h3>Ogni pratica ha il suo spazio.</h3>
+            <p>Panoramica, checklist, richieste, documenti, timeline e calendario restano collegati alla pratica giusta.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="premium-band">
+      <div>
+        <span class="eyebrow">Perché ti serve</span>
+        <h2>InBolla fa percepire meglio il valore del tuo lavoro e alleggerisce la gestione quotidiana del cliente.</h2>
+        <p>
+          Meno richieste ripetitive, meno documenti da rincorrere, più chiarezza su ogni pratica.
+          Il cliente trova risposte ordinate prima ancora di doverle chiedere.
+        </p>
+      </div>
+      <a class="button large" href="${demoUrl()}">Apri demo</a>
+    </section>
+
+    <section class="faq-section" id="faq">
+      <div class="section-title centered">
+        <span class="eyebrow">FAQ</span>
+        <h2>Domande frequenti</h2>
+      </div>
+      <div class="faq-list">
+        <details open>
+          <summary>A chi serve InBolla?</summary>
+          <p>A geometri e studi tecnici che vogliono dare ai clienti un accesso chiaro a pratiche, documenti, scadenze e aggiornamenti.</p>
+        </details>
+        <details>
+          <summary>Il cliente può modificare i dati?</summary>
+          <p>No. L’area cliente nasce come spazio ordinato e controllato: il cliente consulta ciò che lo studio decide di condividere.</p>
+        </details>
+        <details>
+          <summary>Qual è il valore per lo studio?</summary>
+          <p>Meno richieste ripetitive, meno documenti dispersi e una percezione più professionale del servizio offerto.</p>
+        </details>
+        <details>
+          <summary>Serve installare qualcosa?</summary>
+          <p>No. La piattaforma è pensata per essere accessibile online, sia dallo studio sia dal cliente.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="contact-band" id="contatti">
+      <div class="contact-copy">
+        <span class="eyebrow">Richiedi accesso</span>
+        <h2>Vuoi provare InBolla nel tuo studio?</h2>
+        <p>Lascia i tuoi dati: ti ricontatteremo per una demo e per capire come adattare la piattaforma al tuo flusso di lavoro.</p>
+      </div>
+      <form class="contact-form" id="contactForm" action="https://formspree.io/f/mnjwbaoz" method="POST">
+        <input type="hidden" name="_subject" value="Nuova richiesta demo InBolla" />
+        <div class="field"><label>Nome e cognome</label><input name="name" required /></div>
+        <div class="field"><label>Studio</label><input name="studio" /></div>
+        <div class="field"><label>Email</label><input name="email" type="email" required /></div>
+        <div class="field"><label>Messaggio</label><textarea name="message" placeholder="Vorrei vedere una demo di InBolla"></textarea></div>
+        <button class="button" type="submit">Invia richiesta</button>
+        <p class="contact-note">La mail di destinazione verra' collegata appena definita.</p>
+      </form>
+    </section>
+
+    <footer class="site-footer">
+      <span>InBolla</span>
+      <a href="${demoUrl()}">Apri demo</a>
+      <a href="#contatti">Contattaci</a>
+    </footer>
+  `;
+
+  document.querySelector("#contactForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const submit = form.querySelector("button[type='submit']");
+    const note = form.querySelector(".contact-note");
+    submit.disabled = true;
+    note.textContent = "Invio richiesta in corso...";
+    try {
+      const response = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "Invio non riuscito. Riprova tra poco.");
+      }
+      form.reset();
+      note.textContent = "Richiesta inviata. Ti ricontatteremo per fissare una demo.";
+    } catch (error) {
+      note.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  });
 }
 
 async function api(path, options = {}, retries = 2) {
@@ -175,8 +398,8 @@ function shell(content) {
   app.innerHTML = `
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">P</div>
-        <div><strong>Studio Clementi</strong><span>Portale clienti</span></div>
+        <img class="brand-logo" src="./assets/brand/inbolla-mascot.png" alt="" />
+        <div><strong>InBolla</strong><span>Portale clienti</span></div>
       </div>
       <nav class="nav">
         ${nav
@@ -989,8 +1212,25 @@ function bindAdminForms() {
 }
 
 async function start() {
+  if (!isDemoMode) {
+    renderLanding();
+    return;
+  }
   try {
+    const autologin = demoParams.get("autologin");
+    if (autologin === "geometra" || autologin === "cliente") {
+      await api("/api/login", {
+        method: "POST",
+        body: JSON.stringify(
+          autologin === "geometra"
+            ? { username: "clementi", password: "studio" }
+            : { username: "bianchi", password: "cliente" },
+        ),
+      });
+    }
     await loadBootstrap();
+    const requestedRoute = demoParams.get("view");
+    if (requestedRoute) state.route = requestedRoute;
     renderWorkspace();
   } catch {
     renderLogin();

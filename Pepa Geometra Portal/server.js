@@ -11,6 +11,7 @@ const supabaseUrl = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const storageBucket = process.env.SUPABASE_STORAGE_BUCKET || "project-documents";
 const useSupabase = Boolean(supabaseUrl && supabaseKey);
+const demoOnly = process.env.DEMO_ONLY === "true";
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -18,6 +19,11 @@ const contentTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".md": "text/markdown; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
 };
 
 function readJsonDb() {
@@ -739,7 +745,12 @@ async function handleApi(req, res) {
 
 function serveStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
-  const requested = urlPath === "/" ? "/index.html" : urlPath;
+  if (demoOnly && urlPath === "/") {
+    res.writeHead(302, { Location: "/demo" });
+    res.end();
+    return;
+  }
+  const requested = urlPath === "/" || urlPath === "/demo" || urlPath === "/demo/" ? "/index.html" : urlPath;
   const filePath = path.normalize(path.join(root, requested));
   if (!filePath.startsWith(root)) {
     res.writeHead(403);
@@ -774,6 +785,6 @@ const host = process.env.HOST || "0.0.0.0";
 server.listen(port, host, () => {
   const visibleHost = host === "0.0.0.0" ? "127.0.0.1" : host;
   console.log(
-    `Studio Clementi Portal: http://${visibleHost}:${port} (${useSupabase ? "Supabase" : "JSON locale"})`,
+    `InBolla Portal: http://${visibleHost}:${port} (${useSupabase ? "Supabase" : "JSON locale"}${demoOnly ? ", demo only" : ""})`,
   );
 });
