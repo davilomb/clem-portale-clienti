@@ -1,7 +1,7 @@
 const app = document.querySelector("#app");
 const demoParams = new URLSearchParams(window.location.search);
 const isDemoMode = window.location.pathname.replace(/\/$/, "") === "/demo" || demoParams.get("demo") === "1";
-const renderDemoUrl = "https://studio-clementi-portale-clienti.onrender.com/demo";
+const renderDemoUrl = "https://inbolla.onrender.com/demo";
 
 const state = {
   user: null,
