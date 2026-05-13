@@ -113,7 +113,7 @@ Quando Supabase e' attivo:
 - nel database viene salvata solo la scheda documento;
 - il cliente puo' aprire solo documenti visibili al cliente e relativi ai propri progetti.
 - ogni documento puo' avere categoria, tag, stato e versioni;
-- quando viene pubblicato un documento visibile al cliente viene creata una notifica email in coda.
+- quando viene pubblicato un documento visibile al cliente il geometra puo' scegliere se accodare notifica via mail e/o via chat WhatsApp/SMS.
 
 In locale, senza Supabase, il portale continua a salvare solo i metadati documento in `db.json`.
 
@@ -132,9 +132,13 @@ Questo aggiunge:
 - stato documento;
 - relazione tra versioni;
 - numero versione;
-- tabella `notifications` per preparare notifiche email.
+- tabella `notifications` per preparare notifiche multicanale: email e WhatsApp/SMS.
 
-Le notifiche sono per ora accodate nel database. L'invio reale via email richiedera' un provider come Resend, SendGrid o Brevo.
+Le notifiche sono per ora accodate nel database. L'invio reale richiedera':
+
+- un provider email come Brevo, Resend o SendGrid;
+- un provider WhatsApp Business/SMS come Twilio, MessageBird, Brevo Conversations o Meta WhatsApp Cloud API;
+- un job server-side che legga le notifiche `Da inviare`, chiami il provider corretto e aggiorni lo stato a `Inviata` o `Errore`.
 
 ## Prossimi passaggi tecnici
 
@@ -142,7 +146,7 @@ Le notifiche sono per ora accodate nel database. L'invio reale via email richied
 2. Aggiungere invito email cliente.
 3. Aggiungere versionamento documenti.
 4. Aggiungere log accessi e download.
-5. Aggiungere notifiche email.
+5. Collegare l'invio reale delle notifiche email e WhatsApp/SMS.
 6. Preparare backup e procedure GDPR.
 
 ## Stack consigliato per la fase successiva

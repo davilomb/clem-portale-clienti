@@ -5,6 +5,7 @@ const path = require("path");
 
 const root = __dirname;
 const dataPath = path.join(root, "data", "db.json");
+const localUploadRoot = path.join(root, "data", "uploads");
 const sessions = new Map();
 
 const supabaseUrl = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
@@ -32,6 +33,13 @@ function readJsonDb() {
 
 function writeJsonDb(db) {
   fs.writeFileSync(dataPath, `${JSON.stringify(db, null, 2)}\n`);
+}
+
+function localStoragePath(storageKey) {
+  const normalized = path.normalize(storageKey).replace(/^(\.\.[/\\])+/, "");
+  const fullPath = path.join(localUploadRoot, normalized);
+  if (!fullPath.startsWith(localUploadRoot)) throw new Error("Percorso file non valido");
+  return fullPath;
 }
 
 function sendJson(res, status, payload, headers = {}) {
@@ -199,8 +207,9 @@ function clientVisibleDb(db, user) {
     documents: db.documents.filter(
       (document) => ids.has(document.projectId) && document.visibility === "Cliente",
     ),
-    timeline: db.timeline.filter((entry) => ids.has(entry.projectId)),
-    events: db.events.filter((event) => ids.has(event.projectId)),
+    documentFolders: (db.documentFolders || []).filter((folder) => ids.has(folder.projectId)),
+    timeline: db.timeline.filter((entry) => ids.has(entry.projectId) && entry.visibility !== "Interno"),
+    events: db.events.filter((event) => ids.has(event.projectId) && event.visibility !== "Interno"),
     checklist: db.checklist.filter((item) => ids.has(item.projectId)),
     requests: db.requests.filter((item) => ids.has(item.projectId)),
     notifications: [],
@@ -215,11 +224,15 @@ function clientForProject(db, projectId) {
 
 async function queueNotification(store, db, payload) {
   const client = clientForProject(db, payload.projectId);
-  if (!client?.email) return null;
+  const channel = payload.channel || "Email";
+  if (channel === "Email" && !client?.email) return null;
+  if (channel === "WhatsApp/SMS" && !client?.phone) return null;
   return store.insert("notifications", {
     id: `note-${Date.now()}-${Math.round(Math.random() * 1000)}`,
     projectId: payload.projectId,
+    channel,
     recipientEmail: client.email,
+    recipientPhone: client.phone || "",
     notificationType: payload.notificationType,
     relatedType: payload.relatedType,
     relatedId: payload.relatedId,
@@ -254,6 +267,7 @@ function fromSnake(row) {
     phone: row.phone,
     clientId: row.client_id,
     projectId: row.project_id,
+    folderId: row.folder_id,
     title: row.title,
     client: row.client,
     address: row.address,
@@ -262,6 +276,9 @@ function fromSnake(row) {
     updatedAt: row.updated_at,
     description: row.description,
     progress: row.progress,
+    workAmount: row.work_amount,
+    technicalFee: row.technical_fee,
+    projectPhotos: row.project_photos,
     nextAction: row.next_action,
     nextActionOwner: row.next_action_owner,
     nextActionDue: row.next_action_due,
@@ -272,8 +289,14 @@ function fromSnake(row) {
     category: row.category,
     tags: row.tags,
     documentStatus: row.document_status,
+    comment: row.comment,
     parentDocumentId: row.parent_document_id,
     versionNumber: row.version_number,
+    source: row.source,
+    requestId: row.request_id,
+    uploadedDocumentId: row.uploaded_document_id,
+    uploadRequired: row.upload_required,
+    requestedDocumentTitle: row.requested_document_title,
     storageKey: row.storage_key,
     fileName: row.file_name,
     mimeType: row.mime_type,
@@ -285,6 +308,8 @@ function fromSnake(row) {
     label: row.label,
     dueDate: row.due_date,
     recipientEmail: row.recipient_email,
+    recipientPhone: row.recipient_phone,
+    channel: row.channel,
     notificationType: row.notification_type,
     relatedType: row.related_type,
     relatedId: row.related_id,
@@ -327,7 +352,7 @@ async function optionalTableGet(table, query = "select=*") {
 }
 
 async function tableInsert(table, row) {
-  const rows = await supabaseFetch(`/rest/v1/${table}`, {
+  const rows = await supabaseFetch(`/rest/v1/${table === "documentFolders" ? "document_folders" : table}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -339,7 +364,7 @@ async function tableInsert(table, row) {
 }
 
 async function tableUpdate(table, id, row) {
-  const rows = await supabaseFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+  const rows = await supabaseFetch(`/rest/v1/${table === "documentFolders" ? "document_folders" : table}?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -391,19 +416,20 @@ async function storageSignedUrl(storageKey) {
 
 async function readDb() {
   if (!useSupabase) return readJsonDb();
-  const [users, clients, projects, documents, timeline, events, checklist, requests, notifications] =
+  const [users, clients, projects, documents, documentFolders, timeline, events, checklist, requests, notifications] =
     await Promise.all([
       tableGet("users", "select=*"),
       tableGet("clients", "select=*"),
       tableGet("projects", "select=*&order=updated_at.desc"),
       tableGet("documents", "select=*&order=date.desc,version_number.desc"),
+      optionalTableGet("document_folders", "select=*&order=name.asc"),
       tableGet("timeline", "select=*&order=date.desc"),
       tableGet("events", "select=*"),
       tableGet("checklist", "select=*"),
       tableGet("requests", "select=*"),
       optionalTableGet("notifications", "select=*&order=created_at.desc"),
     ]);
-  return { users, clients, projects, documents, timeline, events, checklist, requests, notifications };
+  return { users, clients, projects, documents, documentFolders, timeline, events, checklist, requests, notifications };
 }
 
 function createLocalStore(db) {
@@ -417,12 +443,22 @@ function createLocalStore(db) {
     async update(table, id, row) {
       const record = db[table].find((item) => item.id === id);
       if (!record) return null;
-      Object.assign(record, row);
+      Object.assign(record, Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined)));
       writeJsonDb(db);
       return record;
     },
-    async upload() {
-      return null;
+    async delete(table, id) {
+      const index = db[table].findIndex((item) => item.id === id);
+      if (index === -1) return false;
+      db[table].splice(index, 1);
+      writeJsonDb(db);
+      return true;
+    },
+    async upload(storageKey, file) {
+      const destination = localStoragePath(storageKey);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, file.buffer);
+      return storageKey;
     },
     async signedUrl() {
       return null;
@@ -435,6 +471,13 @@ function createStore(db) {
   return {
     insert: tableInsert,
     update: tableUpdate,
+    async delete(table, id) {
+      await supabaseFetch(`/rest/v1/${table === "documentFolders" ? "document_folders" : table}?id=eq.${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" },
+      });
+      return true;
+    },
     upload: storageUpload,
     signedUrl: storageSignedUrl,
   };
@@ -443,10 +486,20 @@ function createStore(db) {
 function canAccessDocument(user, db, document) {
   if (!document) return false;
   if (isAdmin(user)) return true;
+  if (document.source === "Cliente") {
+    return db.projects.some(
+      (project) => project.id === document.projectId && project.clientId === user.clientId,
+    );
+  }
   if (document.visibility !== "Cliente") return false;
   return db.projects.some(
     (project) => project.id === document.projectId && project.clientId === user.clientId,
   );
+}
+
+function fileExtension(file, fallback = "PDF") {
+  const extension = file?.filename?.split(".").pop();
+  return extension ? extension.toUpperCase() : fallback;
 }
 
 async function documentPayload(req) {
@@ -519,9 +572,81 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "File non ancora caricato per questo documento" });
       return;
     }
+    if (!useSupabase) {
+      const filePath = localStoragePath(document.storageKey);
+      if (!fs.existsSync(filePath)) {
+        sendJson(res, 404, { error: "File locale non trovato" });
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": document.mimeType || "application/octet-stream",
+        "Content-Disposition": `inline; filename="${encodeURIComponent(document.fileName || document.title)}"`,
+      });
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
     const signedUrl = await store.signedUrl(document.storageKey);
     res.writeHead(302, { Location: signedUrl });
     res.end();
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/client-documents") {
+    const { fields, file } = await documentPayload(req);
+    const project = db.projects.find((item) => item.id === fields.projectId);
+    const request = db.requests.find((item) => item.id === fields.requestId && item.projectId === fields.projectId);
+    if (!project || project.clientId !== user.clientId || !request?.uploadRequired) {
+      sendJson(res, 403, { error: "Caricamento non autorizzato" });
+      return;
+    }
+    if (!file?.filename) {
+      sendJson(res, 400, { error: "Seleziona un file da caricare" });
+      return;
+    }
+
+    const documentId = `client-doc-${Date.now()}`;
+    const safeFilename = `${Date.now()}-${slug(file.filename)}${path.extname(file.filename)}`;
+    const storageKey = file ? `client-uploads/${fields.projectId}/${documentId}/${safeFilename}` : "";
+    if (file) await store.upload(storageKey, file);
+
+    await store.insert("documents", {
+      id: documentId,
+      projectId: fields.projectId,
+      folderId: "",
+      title: request.requestedDocumentTitle || request.title,
+      type: fileExtension(file),
+      version: "v1.0",
+      versionNumber: 1,
+      date: todayLabel(),
+      visibility: "Interno",
+      category: "Documento cliente",
+      tags: "caricato dal cliente",
+      documentStatus: "Da verificare",
+      comment: fields.comment || `Documento inviato dal cliente per la richiesta: ${request.title}`,
+      parentDocumentId: "",
+      requestId: request.id,
+      source: "Cliente",
+      storageKey,
+      fileName: file.filename,
+      mimeType: file.contentType,
+      fileSize: file.buffer.length,
+    });
+
+    await store.update("requests", request.id, {
+      status: "Caricato dal cliente",
+      uploadedDocumentId: documentId,
+    });
+
+    await queueNotification(store, db, {
+      projectId: fields.projectId,
+      notificationType: "Documento caricato dal cliente",
+      relatedType: "document",
+      relatedId: documentId,
+      subject: "Documento caricato dal cliente",
+      message: `${user.name} ha caricato un documento per la richiesta: ${request.title}.`,
+    });
+
+    sendJson(res, 201, { ok: true });
     return;
   }
 
@@ -551,7 +676,9 @@ async function handleApi(req, res) {
       phase: payload.phase || "Avvio incarico",
       updatedAt: todayLabel(),
       description: payload.description || "Nuovo progetto creato dal gestionale.",
-      progress: Number(payload.progress || 5),
+      workAmount: Number(payload.workAmount || 0),
+      technicalFee: Number(payload.technicalFee || 0),
+      projectPhotos: [],
       nextAction: payload.nextAction || "Definire la prossima azione operativa.",
       nextActionOwner: payload.nextActionOwner || "Studio",
       nextActionDue: payload.nextActionDue || "Da definire",
@@ -574,7 +701,8 @@ async function handleApi(req, res) {
       status: payload.status || project.status,
       phase: payload.phase || project.phase,
       description: payload.description || project.description,
-      progress: Number(payload.progress ?? project.progress),
+      workAmount: Number(payload.workAmount ?? project.workAmount ?? 0),
+      technicalFee: Number(payload.technicalFee ?? project.technicalFee ?? 0),
       nextAction: payload.nextAction || project.nextAction,
       nextActionOwner: payload.nextActionOwner || project.nextActionOwner,
       nextActionDue: payload.nextActionDue || project.nextActionDue,
@@ -586,53 +714,78 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/documents") {
     const { fields, file } = await documentPayload(req);
-    if (!fields.projectId || !fields.title) {
+    if (!fields.projectId || (!fields.title && !fields.parentDocumentId)) {
       sendJson(res, 400, { error: "Progetto e nome documento sono obbligatori" });
       return;
     }
-    const documentId = `doc-${Date.now()}`;
-    const parentDocumentId = fields.parentDocumentId || "";
-    const siblingVersions = db.documents.filter(
-      (document) =>
-        document.id === parentDocumentId ||
-        document.parentDocumentId === parentDocumentId ||
-        (!parentDocumentId && document.title === fields.title && document.projectId === fields.projectId),
-    );
-    const versionNumber = parentDocumentId
-      ? Math.max(1, ...siblingVersions.map((document) => Number(document.versionNumber || 1))) + 1
+    const existingDocument = fields.parentDocumentId
+      ? db.documents.find((document) => document.id === fields.parentDocumentId)
+      : null;
+    const documentId = existingDocument?.id || `doc-${Date.now()}`;
+    const versionNumber = existingDocument
+      ? Number(existingDocument.versionNumber || 1) + 1
       : Number(fields.versionNumber || 1);
     const safeFilename = file?.filename ? `${Date.now()}-${slug(file.filename)}${path.extname(file.filename)}` : "";
-    const storageKey = file && useSupabase ? `projects/${fields.projectId}/${documentId}/${safeFilename}` : "";
-    if (file && useSupabase) await store.upload(storageKey, file);
-    await store.insert("documents", {
+    const storageKey = file ? `projects/${fields.projectId}/${documentId}/${safeFilename}` : "";
+    if (file) await store.upload(storageKey, file);
+    const documentRecord = {
       id: documentId,
       projectId: fields.projectId,
-      title: fields.title,
-      type: fields.type || file?.filename?.split(".").pop()?.toUpperCase() || "PDF",
+      folderId: fields.folderId || existingDocument?.folderId || "",
+      title: fields.title || existingDocument?.title,
+      type: fileExtension(file, existingDocument?.type || "PDF"),
       version: fields.version || `v${versionNumber}.0`,
       versionNumber,
       date: todayLabel(),
       visibility: fields.visibility || "Cliente",
-      category: fields.category || "Altro",
+      category: fields.category || existingDocument?.category || "Altro",
       tags: fields.tags || "",
-      documentStatus: fields.documentStatus || "Pubblicato",
-      parentDocumentId,
-      storageKey,
-      fileName: file?.filename || "",
-      mimeType: file?.contentType || "",
-      fileSize: file?.buffer?.length || 0,
-    });
-    if ((fields.visibility || "Cliente") === "Cliente") {
-      await queueNotification(store, db, {
+      documentStatus: fields.documentStatus || "Provvisorio",
+      comment: fields.comment || "",
+      parentDocumentId: "",
+      storageKey: storageKey || existingDocument?.storageKey || "",
+      fileName: file?.filename || existingDocument?.fileName || "",
+      mimeType: file?.contentType || existingDocument?.mimeType || "",
+      fileSize: file?.buffer?.length || existingDocument?.fileSize || 0,
+    };
+    if (existingDocument) {
+      await store.update("documents", documentId, documentRecord);
+    } else {
+      await store.insert("documents", documentRecord);
+    }
+    const visibility = fields.visibility || "Cliente";
+    const shouldNotifyByEmail = fields.notifyEmail === "true";
+    const shouldNotifyByChat = fields.notifyChat === "true";
+    if (visibility === "Cliente" && (shouldNotifyByEmail || shouldNotifyByChat)) {
+      const notificationBase = {
         projectId: fields.projectId,
-        notificationType: parentDocumentId ? "Nuova versione documento" : "Nuovo documento",
+        notificationType: existingDocument ? "Nuova versione documento" : "Nuovo documento",
         relatedType: "document",
         relatedId: documentId,
-        subject: parentDocumentId ? "Nuova versione documento disponibile" : "Nuovo documento disponibile",
-        message: `${fields.title} e' disponibile nel portale clienti.`,
-      });
+        subject: existingDocument ? "Nuova versione documento disponibile" : "Nuovo documento disponibile",
+        message: `${documentRecord.title} e' disponibile nel portale clienti.`,
+      };
+      if (shouldNotifyByEmail) await queueNotification(store, db, { ...notificationBase, channel: "Email" });
+      if (shouldNotifyByChat) await queueNotification(store, db, { ...notificationBase, channel: "WhatsApp/SMS" });
     }
     sendJson(res, 201, { ok: true });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/document-folders") {
+    const payload = await bodyJson(req);
+    if (!payload.projectId || !payload.name) {
+      sendJson(res, 400, { error: "Progetto e nome cartella sono obbligatori" });
+      return;
+    }
+    const folder = {
+      id: `folder-${Date.now()}`,
+      projectId: payload.projectId,
+      name: payload.name,
+      description: payload.description || "",
+    };
+    await store.insert("documentFolders", folder);
+    sendJson(res, 201, { ok: true, id: folder.id });
     return;
   }
 
@@ -648,8 +801,29 @@ async function handleApi(req, res) {
       date: todayLabel(),
       title: payload.title,
       body: payload.body,
+      color: payload.color || "#2f6f6d",
+      visibility: payload.visibility || "Cliente",
     });
     sendJson(res, 201, { ok: true });
+    return;
+  }
+
+  if ((req.method === "PATCH" || req.method === "DELETE") && url.pathname.startsWith("/api/timeline/")) {
+    const id = decodeURIComponent(url.pathname.replace("/api/timeline/", ""));
+    if (req.method === "DELETE") {
+      await store.delete("timeline", id);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    const payload = await bodyJson(req);
+    await store.update("timeline", id, {
+      date: payload.date,
+      title: payload.title,
+      body: payload.body,
+      color: payload.color,
+      visibility: payload.visibility,
+    });
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -666,8 +840,30 @@ async function handleApi(req, res) {
       month: payload.month.toUpperCase(),
       title: payload.title,
       note: payload.note || "",
+      color: payload.color || "#c78734",
+      visibility: payload.visibility || "Cliente",
     });
     sendJson(res, 201, { ok: true });
+    return;
+  }
+
+  if ((req.method === "PATCH" || req.method === "DELETE") && url.pathname.startsWith("/api/events/")) {
+    const id = decodeURIComponent(url.pathname.replace("/api/events/", ""));
+    if (req.method === "DELETE") {
+      await store.delete("events", id);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    const payload = await bodyJson(req);
+    await store.update("events", id, {
+      day: payload.day,
+      month: payload.month?.toUpperCase(),
+      title: payload.title,
+      note: payload.note || "",
+      color: payload.color,
+      visibility: payload.visibility,
+    });
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -682,8 +878,26 @@ async function handleApi(req, res) {
       projectId: payload.projectId,
       label: payload.label,
       status: payload.status || "Da fare",
+      notes: payload.notes || "",
     });
     sendJson(res, 201, { ok: true });
+    return;
+  }
+
+  if ((req.method === "PATCH" || req.method === "DELETE") && url.pathname.startsWith("/api/checklist/")) {
+    const id = decodeURIComponent(url.pathname.replace("/api/checklist/", ""));
+    if (req.method === "DELETE") {
+      await store.delete("checklist", id);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    const payload = await bodyJson(req);
+    await store.update("checklist", id, {
+      label: payload.label,
+      status: payload.status,
+      notes: payload.notes,
+    });
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -701,6 +915,8 @@ async function handleApi(req, res) {
       body: payload.body,
       status: payload.status || "Aperta",
       dueDate: payload.dueDate || "Da definire",
+      uploadRequired: payload.uploadRequired === "true" || payload.uploadRequired === true,
+      requestedDocumentTitle: payload.requestedDocumentTitle || "",
     });
     await queueNotification(store, db, {
       projectId: payload.projectId,

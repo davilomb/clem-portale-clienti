@@ -26,6 +26,9 @@ create table if not exists public.projects (
   updated_at text default '',
   description text default '',
   progress integer default 0,
+  work_amount numeric default 0,
+  technical_fee numeric default 0,
+  project_photos jsonb default '[]'::jsonb,
   next_action text default '',
   next_action_owner text default 'Studio',
   next_action_due text default 'Da definire'
@@ -44,6 +47,8 @@ create table if not exists public.documents (
   document_status text default 'Pubblicato',
   parent_document_id text default '',
   version_number integer default 1,
+  source text default 'Studio',
+  request_id text default '',
   storage_key text default '',
   file_name text default '',
   mime_type text default '',
@@ -53,7 +58,9 @@ create table if not exists public.documents (
 create table if not exists public.notifications (
   id text primary key,
   project_id text not null references public.projects(id) on delete cascade,
+  channel text not null default 'Email',
   recipient_email text not null,
+  recipient_phone text default '',
   notification_type text not null,
   related_type text not null,
   related_id text not null,
@@ -69,7 +76,9 @@ create table if not exists public.timeline (
   project_id text not null references public.projects(id) on delete cascade,
   date text default '',
   title text not null,
-  body text not null
+  body text not null,
+  color text default '#2f6f6d',
+  visibility text default 'Cliente'
 );
 
 create table if not exists public.events (
@@ -78,14 +87,17 @@ create table if not exists public.events (
   day text not null,
   month text not null,
   title text not null,
-  note text default ''
+  note text default '',
+  color text default '#c78734',
+  visibility text default 'Cliente'
 );
 
 create table if not exists public.checklist (
   id text primary key,
   project_id text not null references public.projects(id) on delete cascade,
   label text not null,
-  status text not null default 'Da fare'
+  status text not null default 'Da fare',
+  notes text default ''
 );
 
 create table if not exists public.requests (
@@ -94,7 +106,10 @@ create table if not exists public.requests (
   title text not null,
   body text not null,
   status text not null default 'Aperta',
-  due_date text default 'Da definire'
+  due_date text default 'Da definire',
+  upload_required boolean default false,
+  requested_document_title text default '',
+  uploaded_document_id text default ''
 );
 
 insert into storage.buckets (id, name, public)
