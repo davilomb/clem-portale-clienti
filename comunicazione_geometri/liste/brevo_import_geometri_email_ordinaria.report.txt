@@ -1,0 +1,7 @@
+Righe contatto valide: 266
+Email uniche valide: 266
+Email non valide escluse: 398
+Email duplicate escluse: 0
+Con cellulare/SMS: 1
+Con telefono fisso: 0
+Formato colonne: CONTACT ID, EMAIL, FIRSTNAME, LASTNAME, SMS, LANDLINE_NUMBER, WHATSAPP, INTERESTS

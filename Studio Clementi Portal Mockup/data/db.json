@@ -1,0 +1,420 @@
+{
+  "users": [
+    {
+      "id": "user-clementi",
+      "username": "clementi",
+      "password": "studio",
+      "name": "Studio Clementi",
+      "role": "Geometra",
+      "email": "info@studioclementi.it"
+    },
+    {
+      "id": "user-bianchi",
+      "username": "bianchi",
+      "password": "cliente",
+      "name": "Marco Bianchi",
+      "role": "Cliente",
+      "email": "cliente@bianchi.it",
+      "clientId": "cliente-bianchi"
+    }
+  ],
+  "clients": [
+    {
+      "id": "cliente-bianchi",
+      "name": "Marco Bianchi",
+      "email": "cliente@bianchi.it",
+      "phone": "+39 333 000 1000"
+    },
+    {
+      "id": "cliente-verdi",
+      "name": "Laura Verdi",
+      "email": "laura@verdi.it",
+      "phone": "+39 333 000 2000"
+    },
+    {
+      "id": "cliente-neri",
+      "name": "Giulia Neri",
+      "email": "giulia@neri.it",
+      "phone": "+39 333 000 3000"
+    }
+  ],
+  "projects": [
+    {
+      "id": "villa-bianchi",
+      "clientId": "cliente-bianchi",
+      "title": "Ristrutturazione Villa Bianchi",
+      "client": "Marco Bianchi",
+      "address": "Via Roma 18, Brescia",
+      "status": "Work in progress",
+      "phase": "Pratica edilizia",
+      "updatedAt": "05 Mag 2026",
+      "description": "Intervento di ristrutturazione interna con aggiornamento catastale e coordinamento delle pratiche comunali.",
+      "progress": 62,
+      "nextAction": "Attesa protocollo comunale e verifica ricevuta di deposito.",
+      "nextActionOwner": "Studio",
+      "nextActionDue": "07 Mag 2026",
+      "workAmount": 145000,
+      "technicalFee": 7800,
+      "projectPhotos": [
+        {
+          "id": "photo-villa-1",
+          "url": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=900&q=80",
+          "caption": "Vista esterna edificio"
+        },
+        {
+          "id": "photo-villa-2",
+          "url": "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=900&q=80",
+          "caption": "Interno in fase di rilievo"
+        }
+      ]
+    },
+    {
+      "id": "negozio-verdi",
+      "clientId": "cliente-verdi",
+      "title": "Cambio destinazione uso - Verdi",
+      "client": "Laura Verdi",
+      "address": "Corso Milano 44, Verona",
+      "status": "In attesa",
+      "phase": "Documenti cliente",
+      "updatedAt": "29 Apr 2026",
+      "description": "Preparazione documentazione per cambio destinazione d'uso da deposito a spazio commerciale.",
+      "progress": 35,
+      "nextAction": "Invio documenti integrativi richiesti allo studio.",
+      "nextActionOwner": "Cliente",
+      "nextActionDue": "09 Mag 2026",
+      "workAmount": 52000,
+      "technicalFee": 4200,
+      "projectPhotos": []
+    },
+    {
+      "id": "studio-neri",
+      "clientId": "cliente-neri",
+      "title": "Accatastamento Studio Neri",
+      "client": "Giulia Neri",
+      "address": "Piazza Garibaldi 7, Mantova",
+      "status": "Completato",
+      "phase": "Consegna finale",
+      "updatedAt": "18 Apr 2026",
+      "description": "Accatastamento e consegna planimetrie aggiornate per studio professionale.",
+      "progress": 100,
+      "nextAction": "Nessuna azione richiesta. Pratica archiviata.",
+      "nextActionOwner": "Nessuno",
+      "nextActionDue": "Completata",
+      "workAmount": 18000,
+      "technicalFee": 1900,
+      "projectPhotos": []
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc-1778594738558",
+      "projectId": "villa-bianchi",
+      "folderId": "folder-1778594682486",
+      "title": "gas casa hera",
+      "type": "PNG",
+      "version": "v1.0",
+      "versionNumber": 1,
+      "date": "12 mag 2026",
+      "visibility": "Cliente",
+      "category": "Altro",
+      "tags": "gas",
+      "documentStatus": "Provvisorio",
+      "comment": "",
+      "parentDocumentId": "",
+      "storageKey": "",
+      "fileName": "castorologo.png",
+      "mimeType": "image/png",
+      "fileSize": 256286
+    },
+    {
+      "id": "doc-1778594644249",
+      "projectId": "villa-bianchi",
+      "folderId": "folder-planimetrie-bianchi",
+      "title": "planimentria terzo piano",
+      "type": "CSV",
+      "version": "v1.0",
+      "versionNumber": 1,
+      "date": "12 mag 2026",
+      "visibility": "Cliente",
+      "category": "Altro",
+      "tags": "",
+      "documentStatus": "Bozza",
+      "comment": "la pianta è verde ",
+      "parentDocumentId": "",
+      "storageKey": "",
+      "fileName": "CSV_sample.csv",
+      "mimeType": "text/csv",
+      "fileSize": 393
+    },
+    {
+      "id": "doc-relazione-bianchi",
+      "projectId": "villa-bianchi",
+      "title": "Relazione tecnica preliminare",
+      "type": "PDF",
+      "version": "v1.2",
+      "date": "02 Mag 2026",
+      "visibility": "Cliente",
+      "category": "Relazione tecnica",
+      "tags": "comune, preliminare",
+      "documentStatus": "Definitivo",
+      "parentDocumentId": "",
+      "versionNumber": 1,
+      "folderId": "folder-pratiche-comunali-bianchi",
+      "comment": "Documento caricato dallo studio."
+    },
+    {
+      "id": "doc-planimetria-bianchi",
+      "projectId": "villa-bianchi",
+      "title": "Planimetria stato di fatto",
+      "type": "DWG",
+      "version": "v1.0",
+      "date": "27 Apr 2026",
+      "visibility": "Cliente",
+      "category": "Planimetria",
+      "tags": "",
+      "documentStatus": "Definitivo",
+      "parentDocumentId": "",
+      "versionNumber": 1,
+      "folderId": "folder-planimetrie-bianchi",
+      "comment": "Tavola aggiornata dopo sopralluogo."
+    },
+    {
+      "id": "doc-preventivo-bianchi",
+      "projectId": "villa-bianchi",
+      "title": "Preventivo opere tecniche",
+      "type": "PDF",
+      "version": "v1.1",
+      "date": "21 Apr 2026",
+      "visibility": "Interno",
+      "category": "Preventivo",
+      "tags": "",
+      "documentStatus": "Definitivo",
+      "parentDocumentId": "",
+      "versionNumber": 1,
+      "folderId": "folder-pratiche-comunali-bianchi",
+      "comment": "Documento caricato dallo studio."
+    },
+    {
+      "id": "doc-integrazione-verdi",
+      "projectId": "negozio-verdi",
+      "title": "Richiesta integrazione documenti",
+      "type": "PDF",
+      "version": "v1.0",
+      "date": "29 Apr 2026",
+      "visibility": "Cliente",
+      "category": "Relazione tecnica",
+      "tags": "",
+      "documentStatus": "Definitivo",
+      "parentDocumentId": "",
+      "versionNumber": 1,
+      "folderId": "folder-generale-verdi",
+      "comment": "Documento caricato dallo studio."
+    }
+  ],
+  "timeline": [
+    {
+      "id": "time-relazione-bianchi",
+      "projectId": "villa-bianchi",
+      "date": "02 Mag 2026",
+      "title": "Caricata relazione aggiornata",
+      "body": "Aggiunta la nuova versione della relazione tecnica con le note richieste dal Comune."
+    },
+    {
+      "id": "time-pratica-bianchi",
+      "projectId": "villa-bianchi",
+      "date": "30 Apr 2026",
+      "title": "Pratica edilizia inviata",
+      "body": "La pratica e' stata inviata tramite portale comunale. In attesa di protocollo."
+    },
+    {
+      "id": "time-sopralluogo-bianchi",
+      "projectId": "villa-bianchi",
+      "date": "24 Apr 2026",
+      "title": "Sopralluogo completato",
+      "body": "Misure verificate e fotografie di cantiere archiviate nella cartella interna."
+    },
+    {
+      "id": "time-integrazione-verdi",
+      "projectId": "negozio-verdi",
+      "date": "29 Apr 2026",
+      "title": "Integrazione richiesta",
+      "body": "Servono visura aggiornata e documento di identita' del legale rappresentante."
+    }
+  ],
+  "events": [
+    {
+      "id": "event-protocollo-bianchi",
+      "projectId": "villa-bianchi",
+      "day": "07",
+      "month": "MAG",
+      "title": "Protocollo pratica",
+      "note": "Verifica ricezione dal portale comunale."
+    },
+    {
+      "id": "event-call-bianchi",
+      "projectId": "villa-bianchi",
+      "day": "13",
+      "month": "MAG",
+      "title": "Call con cliente",
+      "note": "Aggiornamento su tempi e prossime firme."
+    },
+    {
+      "id": "event-documenti-verdi",
+      "projectId": "negozio-verdi",
+      "day": "09",
+      "month": "MAG",
+      "title": "Scadenza documenti",
+      "note": "Attesa integrazioni da parte del cliente."
+    }
+  ],
+  "checklist": [
+    {
+      "id": "check-bianchi-1",
+      "projectId": "villa-bianchi",
+      "label": "Sopralluogo completato",
+      "status": "Completato"
+    },
+    {
+      "id": "check-bianchi-2",
+      "projectId": "villa-bianchi",
+      "label": "Relazione tecnica aggiornata",
+      "status": "Completato"
+    },
+    {
+      "id": "check-bianchi-3",
+      "projectId": "villa-bianchi",
+      "label": "Protocollo comunale",
+      "status": "In corso"
+    },
+    {
+      "id": "check-bianchi-4",
+      "projectId": "villa-bianchi",
+      "label": "Consegna documentazione finale",
+      "status": "Da fare"
+    },
+    {
+      "id": "check-verdi-1",
+      "projectId": "negozio-verdi",
+      "label": "Raccolta documenti cliente",
+      "status": "In corso"
+    },
+    {
+      "id": "check-verdi-2",
+      "projectId": "negozio-verdi",
+      "label": "Verifica cambio destinazione d'uso",
+      "status": "Da fare"
+    },
+    {
+      "id": "check-neri-1",
+      "projectId": "studio-neri",
+      "label": "Planimetrie consegnate",
+      "status": "Completato"
+    }
+  ],
+  "requests": [
+    {
+      "id": "req-bianchi-1",
+      "projectId": "villa-bianchi",
+      "title": "Conferma disponibilita' per call",
+      "body": "Lo studio propone una call di aggiornamento il 13 Maggio.",
+      "status": "Aperta",
+      "dueDate": "12 Mag 2026"
+    },
+    {
+      "id": "req-bianchi-upload-1",
+      "projectId": "villa-bianchi",
+      "title": "Caricamento documenti personali",
+      "body": "Carica il documento di identita' e il codice fiscale necessari per completare la pratica.",
+      "status": "In attesa cliente",
+      "dueDate": "15 Mag 2026",
+      "uploadRequired": true,
+      "requestedDocumentTitle": "Documento identita' e codice fiscale"
+    },
+    {
+      "id": "req-verdi-1",
+      "projectId": "negozio-verdi",
+      "title": "Invio visura aggiornata",
+      "body": "Serve una visura camerale aggiornata per completare la pratica.",
+      "status": "In attesa cliente",
+      "dueDate": "09 Mag 2026"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "note-1778594738559-333",
+      "projectId": "villa-bianchi",
+      "recipientEmail": "cliente@bianchi.it",
+      "notificationType": "Nuovo documento",
+      "relatedType": "document",
+      "relatedId": "doc-1778594738558",
+      "subject": "Nuovo documento disponibile",
+      "message": "gas casa hera e' disponibile nel portale clienti.",
+      "status": "Da inviare",
+      "createdAt": "12 mag 2026",
+      "sentAt": ""
+    },
+    {
+      "id": "note-1778594644286-745",
+      "projectId": "villa-bianchi",
+      "recipientEmail": "cliente@bianchi.it",
+      "notificationType": "Nuovo documento",
+      "relatedType": "document",
+      "relatedId": "doc-1778594644249",
+      "subject": "Nuovo documento disponibile",
+      "message": "planimentria terzo piano e' disponibile nel portale clienti.",
+      "status": "Da inviare",
+      "createdAt": "12 mag 2026",
+      "sentAt": ""
+    }
+  ],
+  "documentFolders": [
+    {
+      "id": "folder-1778594682486",
+      "projectId": "villa-bianchi",
+      "name": "pratiche allacciamenti",
+      "description": "gas luce ecc"
+    },
+    {
+      "id": "folder-planimetrie-bianchi",
+      "projectId": "villa-bianchi",
+      "name": "Planimetrie",
+      "description": "Elaborati grafici e tavole"
+    },
+    {
+      "id": "folder-pratiche-comunali-bianchi",
+      "projectId": "villa-bianchi",
+      "name": "Pratiche comunali",
+      "description": "Comunicazioni, protocolli e autorizzazioni"
+    },
+    {
+      "id": "folder-antincendio-bianchi",
+      "projectId": "villa-bianchi",
+      "name": "Pratiche antincendio",
+      "description": "Documenti Vigili del Fuoco e sicurezza"
+    },
+    {
+      "id": "folder-generale-verdi",
+      "projectId": "negozio-verdi",
+      "name": "Documentazione generale",
+      "description": "Materiale condiviso con il cliente"
+    },
+    {
+      "id": "folder-consegna-neri",
+      "projectId": "studio-neri",
+      "name": "Consegna finale",
+      "description": "Documenti conclusivi"
+    },
+    {
+      "id": "folder-foto-bianchi",
+      "projectId": "villa-bianchi",
+      "name": "Foto sopralluogo",
+      "description": "Immagini e rilievi fotografici"
+    },
+    {
+      "id": "folder-vuota-bianchi",
+      "projectId": "villa-bianchi",
+      "name": "Collaudi e certificazioni",
+      "description": "Cartella pronta per documenti futuri"
+    }
+  ]
+}

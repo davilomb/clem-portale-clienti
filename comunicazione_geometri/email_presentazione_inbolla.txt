@@ -1,0 +1,32 @@
+Oggetto: Inbolla, una piattaforma per semplificare il rapporto tra studio e cliente
+
+Salve Geom. {{Cognome}},
+
+sono Davide Lombardini, lo sviluppatore che ha realizzato Inbolla, una piattaforma pensata per aiutare gli studi tecnici a rendere piu semplice e ordinata la gestione delle pratiche e la comunicazione con i clienti.
+
+Sono di Rimini, quindi conosco da vicino il contesto in cui lavorano molti studi tecnici del territorio e le difficolta quotidiane nel tenere insieme pratiche, documenti, aggiornamenti e richieste dei clienti.
+
+L'idea nasce da un'esigenza molto concreta: dare al cliente dello studio un punto unico dove seguire l'avanzamento della pratica, consultare documenti, ricevere aggiornamenti e interagire in modo piu chiaro con il professionista.
+
+Per lo studio, questo significa ridurre messaggi sparsi, richieste ripetitive e passaggi manuali, mantenendo una gestione piu organizzata delle attivita, dei documenti e delle comunicazioni.
+
+Inbolla e appena uscita in una prima versione beta. Sto cercando alcuni studi con cui confrontarmi direttamente e capire se il progetto puo essere utile nel lavoro quotidiano.
+
+Dato il momento di beta e sviluppo iniziale, per i primi studi interessati sono previste condizioni economiche agevolate e un supporto personalizzato. Per chi vuole provarla in questa fase, partecipare ora puo essere particolarmente conveniente.
+
+Le farebbe piacere fare una breve chiamata conoscitiva di 15 minuti, senza impegno, per mostrarle la piattaforma e capire se puo avere senso anche per il suo studio?
+
+Può visitare il sito ufficiale qui:
+{{Sito}}
+
+Se pensa possa essere interessante, basta rispondere a questa email: organizziamo volentieri una breve chiamata conoscitiva.
+
+Grazie per l'attenzione,
+
+Davide Lombardini
+Inbolla
+{{Telefono}}
+{{Email}}
+{{Sito}}
+
+Se preferisce non ricevere ulteriori comunicazioni su Inbolla, puo rispondere a questa email con "no grazie".

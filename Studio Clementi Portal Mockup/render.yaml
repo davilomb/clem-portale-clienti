@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: inbolla-demo
+    runtime: node
+    plan: free
+    buildCommand: ""
+    startCommand: "node server.js"
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: DEMO_ONLY
+        value: "true"
