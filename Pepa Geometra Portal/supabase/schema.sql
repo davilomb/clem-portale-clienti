@@ -12,7 +12,23 @@ create table if not exists public.clients (
   id text primary key,
   name text not null,
   email text not null,
-  phone text default ''
+  phone text default '',
+  company_name text default '',
+  client_type text default 'Privato',
+  tax_code text default '',
+  vat_number text default '',
+  pec text default '',
+  billing_code text default '',
+  address text default '',
+  city text default '',
+  province text default '',
+  zip text default '',
+  lead_source text default '',
+  crm_status text default 'Attivo',
+  internal_owner text default 'Studio',
+  privacy_status text default 'Da verificare',
+  internal_notes text default '',
+  public_notes text default ''
 );
 
 create table if not exists public.projects (

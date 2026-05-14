@@ -43,6 +43,10 @@ function statusClass(status) {
   return "progress";
 }
 
+function visibilityBadge(isVisible, label = "") {
+  return `<span class="visibility-pill ${isVisible ? "visible" : "hidden"}">${escapeHtml(label || (isVisible ? "Visibile al cliente" : "Nascosto al cliente"))}</span>`;
+}
+
 function icon(name) {
   const icons = {
     home: "⌂",
@@ -331,8 +335,9 @@ function currentProject() {
   return accessibleProjects().find((project) => project.id === state.selectedProjectId) || accessibleProjects()[0];
 }
 
-function projectOptions(selectedId = state.selectedProjectId) {
+function projectOptions(selectedId = state.selectedProjectId, clientId = "") {
   return state.data.projects
+    .filter((project) => !clientId || project.clientId === clientId)
     .map(
       (project) =>
         `<option value="${escapeHtml(project.id)}" ${project.id === selectedId ? "selected" : ""}>${escapeHtml(project.title)}</option>`,
@@ -340,9 +345,9 @@ function projectOptions(selectedId = state.selectedProjectId) {
     .join("");
 }
 
-function clientOptions() {
+function clientOptions(selectedId = "") {
   return state.data.clients
-    .map((client) => `<option value="${escapeHtml(client.id)}">${escapeHtml(client.name)}</option>`)
+    .map((client) => `<option value="${escapeHtml(client.id)}" ${client.id === selectedId ? "selected" : ""}>${escapeHtml(client.name)}</option>`)
     .join("");
 }
 
@@ -486,7 +491,11 @@ function shell(content) {
   document.querySelectorAll("[data-scroll-target]").forEach((button) => {
     button.addEventListener("click", () => {
       state.pendingScrollTarget = button.dataset.scrollTarget;
-      if (state.route !== "project") state.route = "project";
+      if (state.user.role === "Geometra") {
+        if (state.route !== "projectDetail") state.route = "projectDetail";
+      } else if (state.route !== "project") {
+        state.route = "project";
+      }
       renderWorkspace();
     });
   });
@@ -514,6 +523,8 @@ function renderAdmin() {
   shell(views[state.route]());
   bindWorkspaceActions();
   bindAdminForms();
+  scrollToPendingSection();
+  setTimeout(scrollTimelineToNext, 80);
 }
 
 function renderClient() {
@@ -527,6 +538,7 @@ function renderClient() {
   bindWorkspaceActions();
   bindClientActions();
   scrollToPendingSection();
+  setTimeout(scrollTimelineToNext, 80);
 }
 
 function projectRows(projects) {
@@ -681,16 +693,28 @@ function documentFilterOptions(items, selectedValue, label, valueKey = "id", lab
   `;
 }
 
+function documentFilterProjectOptions() {
+  const projects = state.data.projects.filter((project) => !state.documentFilters.clientId || project.clientId === state.documentFilters.clientId);
+  return documentFilterOptions(projects, state.documentFilters.projectId, "Tutti i progetti", "id", "title");
+}
+
 function documentFilterFolderOptions() {
-  const projectId = state.documentFilters.projectId;
-  const folders = state.data.documentFolders.filter((folder) => !projectId || folder.projectId === projectId);
+  const projectIds = state.data.projects
+    .filter((project) => {
+      return (
+        (!state.documentFilters.clientId || project.clientId === state.documentFilters.clientId) &&
+        (!state.documentFilters.projectId || project.id === state.documentFilters.projectId)
+      );
+    })
+    .map((project) => project.id);
+  const folders = state.data.documentFolders.filter((folder) => projectIds.includes(folder.projectId));
   return documentFilterOptions(folders, state.documentFilters.folderId, "Tutte le cartelle");
 }
 
 function filteredDocuments() {
   const filters = state.documentFilters;
   const search = filters.search.trim().toLowerCase();
-  return studioDocuments().filter((doc) => {
+  return state.data.documents.filter((doc) => {
     const project = state.data.projects.find((item) => item.id === doc.projectId);
     const folder = state.data.documentFolders.find((item) => item.id === doc.folderId);
     const client = state.data.clients.find((item) => item.id === project?.clientId);
@@ -727,6 +751,14 @@ function documentExplorer() {
             ${clientProjects
               .map((project) => {
                 const projectDocs = docs.filter((doc) => doc.projectId === project.id);
+                const projectFolders = [
+                  ...state.data.documentFolders.filter((folder) => folder.projectId === project.id),
+                  {
+                    id: "client-uploads",
+                    name: "Documenti caricati dal cliente",
+                    description: "Invii collegati a questo progetto e cliente",
+                  },
+                ];
                 return `
                   <section class="project-document-group">
                     <div class="project-document-heading">
@@ -736,7 +768,10 @@ function documentExplorer() {
                       </div>
                       <button class="button secondary" data-project="${escapeHtml(project.id)}">Apri progetto</button>
                     </div>
-                    ${documentRows(projectDocs, project.id)}
+                    ${documentRows(projectDocs, project.id, {
+                      folders: projectFolders,
+                      folderResolver: (doc) => (doc.source === "Cliente" ? "client-uploads" : doc.folderId || ""),
+                    })}
                   </section>
                 `;
               })
@@ -844,6 +879,29 @@ function projectPhotoGallery(project) {
   `;
 }
 
+function projectPhotoStrip(project) {
+  const photos = project.projectPhotos || [];
+  return `
+    <div class="project-photo-strip" data-photo-gallery>
+      ${
+        photos.length
+          ? photos
+              .slice(0, 3)
+              .map(
+                (photo) => `
+                  <figure>
+                    <img src="${escapeHtml(photo.url)}" alt="${escapeHtml(photo.caption || project.title)}" />
+                    <figcaption>${escapeHtml(photo.caption || "Foto progetto")}</figcaption>
+                  </figure>
+                `,
+              )
+              .join("")
+          : `<div class="empty-state">Nessuna foto caricata.</div>`
+      }
+    </div>
+  `;
+}
+
 function timelineRows(projectId) {
   const entries = state.data.timeline.filter((entry) => entry.projectId === projectId);
   if (!entries.length) return `<div class="empty-state">Nessun aggiornamento pubblicato.</div>`;
@@ -925,6 +983,30 @@ function calendarGrid(projectId, isAdminView = false) {
 }
 
 function projectHistoryItems(projectId) {
+  const monthMap = {
+    gen: 1,
+    feb: 2,
+    mar: 3,
+    apr: 4,
+    mag: 5,
+    giu: 6,
+    lug: 7,
+    ago: 8,
+    set: 9,
+    ott: 10,
+    nov: 11,
+    dic: 12,
+  };
+  const sortableTime = (date = "") => {
+    const cleaned = String(date).replace("·", " ");
+    const parts = cleaned.trim().split(/\s+/);
+    const day = Number(parts[0]) || 1;
+    const month = monthMap[String(parts[1] || "mag").slice(0, 3).toLowerCase()] || 5;
+    const year = Number(parts.find((part) => /^\d{4}$/.test(part))) || 2026;
+    const time = parts.find((part) => /^\d{1,2}:\d{2}$/.test(part)) || "00:00";
+    const [hours, minutes] = time.split(":").map(Number);
+    return new Date(year, month - 1, day, hours || 0, minutes || 0).getTime();
+  };
   const updates = state.data.timeline
     .filter((entry) => entry.projectId === projectId)
     .map((entry) => ({
@@ -936,6 +1018,7 @@ function projectHistoryItems(projectId) {
       kind: "Aggiornamento",
       color: entry.color || "#2f6f6d",
       visibility: entry.visibility || "Cliente",
+      sortTime: sortableTime(entry.date),
     }));
   const events = state.data.events
     .filter((event) => event.projectId === projectId)
@@ -950,21 +1033,30 @@ function projectHistoryItems(projectId) {
       month: event.month,
       color: event.color || "#c78734",
       visibility: event.visibility || "Cliente",
+      sortTime: sortableTime(`${event.day} ${event.month} 2026`),
     }));
-  return [...updates, ...events];
+  return [...updates, ...events].sort((a, b) => a.sortTime - b.sortTime);
+}
+
+function nextTimelineActivity(projectId) {
+  const items = projectHistoryItems(projectId);
+  const today = new Date(2026, 4, 13).getTime();
+  return items.find((item) => item.sortTime >= today) || items.at(-1) || null;
 }
 
 function adminSchedulePanel(projectId) {
   const items = projectHistoryItems(projectId);
   if (!items.length) return `<div class="empty-state">Nessun aggiornamento o evento disponibile.</div>`;
+  const nextItem = nextTimelineActivity(projectId);
   if (state.adminScheduleView === "calendar") return calendarGrid(projectId, true);
   return `
     <div class="admin-schedule">
+      ${timelineNextCard(nextItem)}
       <div class="horizontal-timeline admin-history-timeline">
         ${items
           .map(
             (item) => `
-              <button class="timeline-card history-card" data-history-type="${escapeHtml(item.type)}" data-history-id="${escapeHtml(item.id)}" style="--item-color: ${escapeHtml(item.color)}">
+              <button class="timeline-card history-card" data-history-type="${escapeHtml(item.type)}" data-history-id="${escapeHtml(item.id)}" data-history-focus="${item.id === nextItem?.id ? "true" : "false"}" style="--item-color: ${escapeHtml(item.color)}">
                 <span class="timeline-dot"></span>
                 <time>${escapeHtml(item.date)}</time>
                 <strong>${escapeHtml(item.title)}</strong>
@@ -980,15 +1072,30 @@ function adminSchedulePanel(projectId) {
   `;
 }
 
+function timelineNextCard(item) {
+  if (!item) return "";
+  return `
+    <div class="timeline-next-card">
+      <span class="eyebrow">Prossima voce timeline</span>
+      <strong>${escapeHtml(item.title)}</strong>
+      <div class="next-action-meta">
+        <span>${escapeHtml(item.kind)}</span>
+        <span>${escapeHtml(item.date)}</span>
+        <span>${item.visibility === "Cliente" ? "Visibile al cliente" : "Interno studio"}</span>
+      </div>
+    </div>
+  `;
+}
+
 function nextActionPanel(project) {
+  const item = nextTimelineActivity(project.id);
   return `
     <section class="panel">
-      <div class="panel-header"><h2>Cosa succede adesso</h2></div>
+      <div class="panel-header"><h2>Timeline progetto</h2></div>
       <div class="panel-body next-action">
-        <strong>${escapeHtml(project.nextAction || "Prossima azione da definire.")}</strong>
+        ${timelineNextCard(item)}
         <div class="next-action-meta">
-          <span>A carico di: ${escapeHtml(project.nextActionOwner || "Studio")}</span>
-          <span>Scadenza: ${escapeHtml(project.nextActionDue || "Da definire")}</span>
+          <span>Alimentata da aggiornamenti e scadenze</span>
         </div>
       </div>
     </section>
@@ -1014,18 +1121,12 @@ function timelineHorizontalRows(projectId) {
 }
 
 function clientProgressPanel(project) {
+  const item = nextTimelineActivity(project.id);
   return `
     <section class="panel client-progress-panel" id="project-timeline">
-      <div class="panel-header"><h2>Prossimo step e timeline</h2><span class="readonly-pill">Sola lettura</span></div>
+      <div class="panel-header"><h2>Timeline progetto</h2><span class="readonly-pill">Sola lettura</span></div>
       <div class="panel-body">
-        <div class="next-action client-next-action">
-          <span class="eyebrow">Cosa succede adesso</span>
-          <strong>${escapeHtml(project.nextAction || "Prossima azione da definire.")}</strong>
-          <div class="next-action-meta">
-            <span>A carico di: ${escapeHtml(project.nextActionOwner || "Studio")}</span>
-            <span>Scadenza: ${escapeHtml(project.nextActionDue || "Da definire")}</span>
-          </div>
-        </div>
+        ${timelineNextCard(item)}
         <div class="horizontal-timeline">${timelineHorizontalRows(project.id)}</div>
       </div>
     </section>
@@ -1170,9 +1271,6 @@ function projectCreateForm() {
       <div class="field"><label>Fase</label><input name="phase" value="Avvio incarico" /></div>
       <div class="field"><label>Importo lavori</label><input name="workAmount" type="number" min="0" value="0" /></div>
       <div class="field"><label>Compenso tecnico</label><input name="technicalFee" type="number" min="0" value="0" /></div>
-      <div class="field wide"><label>Prossima azione</label><textarea name="nextAction">Definire la prossima azione operativa.</textarea></div>
-      <div class="field"><label>A carico di</label><select name="nextActionOwner"><option>Studio</option><option>Cliente</option><option>Nessuno</option></select></div>
-      <div class="field"><label>Scadenza prossima azione</label><input name="nextActionDue" value="Da definire" /></div>
       <div class="field wide"><label>Descrizione</label><textarea name="description"></textarea></div>
       <button class="button wide" type="submit">Crea progetto</button>
     </form>
@@ -1190,11 +1288,6 @@ function projectUpdateForm(project) {
       <div class="field"><label>Importo lavori</label><input name="workAmount" type="number" min="0" value="${escapeHtml(project.workAmount || 0)}" /></div>
       <div class="field"><label>Compenso tecnico</label><input name="technicalFee" type="number" min="0" value="${escapeHtml(project.technicalFee || 0)}" /></div>
       <div class="field wide"><label>Fase</label><input name="phase" value="${escapeHtml(project.phase)}" /></div>
-      <div class="field wide"><label>Prossima azione</label><textarea name="nextAction">${escapeHtml(project.nextAction || "")}</textarea></div>
-      <div class="field"><label>A carico di</label><select name="nextActionOwner">
-        ${["Studio", "Cliente", "Nessuno"].map((owner) => `<option ${project.nextActionOwner === owner ? "selected" : ""}>${owner}</option>`).join("")}
-      </select></div>
-      <div class="field"><label>Scadenza</label><input name="nextActionDue" value="${escapeHtml(project.nextActionDue || "")}" /></div>
       <div class="field wide"><label>Descrizione</label><textarea name="description">${escapeHtml(project.description)}</textarea></div>
       <div class="field wide"><label>Foto progetto</label><input name="projectPhotosPreview" type="file" accept="image/*" multiple data-photo-input /></div>
       <div class="field wide"><div class="photo-grid compact" data-photo-preview></div></div>
@@ -1230,9 +1323,12 @@ function requestForm(project) {
 }
 
 function documentFolderForm(projectId = state.selectedProjectId) {
+  const project = state.data.projects.find((item) => item.id === projectId) || currentProject();
+  const clientId = project?.clientId || state.data.clients[0]?.id || "";
   return `
     <form class="panel-body form-grid" data-form="documentFolder">
-      <input type="hidden" name="projectId" value="${escapeHtml(projectId)}" />
+      <div class="field wide"><label>Cliente</label><select name="clientId" data-client-filter>${clientOptions(clientId)}</select></div>
+      <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions(projectId, clientId)}</select></div>
       <div class="field wide"><label>Nome cartella</label><input name="name" placeholder="es. Planimetrie" required /></div>
       <div class="field wide"><label>Descrizione</label><input name="description" placeholder="Breve nota per questa categoria" /></div>
       <button class="button wide" type="submit">Crea cartella</button>
@@ -1244,7 +1340,8 @@ function documentForm(project) {
   const firstFolder = state.data.documentFolders.find((folder) => folder.projectId === project.id)?.id || "";
   return `
     <form class="panel-body form-grid" data-form="document">
-      <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+      <div class="field wide"><label>Cliente</label><select name="clientId" data-client-filter>${clientOptions(project.clientId)}</select></div>
+      <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions(project.id, project.clientId)}</select></div>
       <div class="field wide"><label>Cartella</label><select name="folderId">${documentFolderOptions(project.id)}</select></div>
       <div class="field wide"><label>Aggiorna documento esistente</label><select name="parentDocumentId">${documentVersionOptions(project.id, firstFolder)}</select></div>
       <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
@@ -1283,6 +1380,22 @@ function eventForm(project) {
       <div class="field"><label>Colore</label><input name="color" type="color" value="#c78734" /></div>
       <div class="field"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
       <button class="button wide" type="submit">Aggiungi scadenza</button>
+    </form>
+  `;
+}
+
+function historyForm(project) {
+  return `
+    <form class="panel-body form-grid" data-form="history">
+      <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
+      <div class="field wide"><label>Tipo voce</label><select name="kind"><option>Aggiornamento</option><option>Scadenza</option></select></div>
+      <div class="field"><label>Data</label><input name="date" placeholder="13 Mag 2026" required /></div>
+      <div class="field"><label>Ora facoltativa</label><input name="time" type="time" /></div>
+      <div class="field wide"><label>Titolo</label><input name="title" required /></div>
+      <div class="field wide"><label>Descrizione</label><textarea name="body" required></textarea></div>
+      <div class="field"><label>Colore</label><input name="color" type="color" value="#2f6f6d" /></div>
+      <div class="field"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
+      <button class="button wide" type="submit">Aggiungi alla timeline</button>
     </form>
   `;
 }
@@ -1331,6 +1444,7 @@ function adminModalContent(project = currentProject()) {
     document: ["Carica documento", project ? documentForm(project) : ""],
     timeline: ["Nuovo aggiornamento", project ? timelineForm(project) : ""],
     event: ["Nuova scadenza", project ? eventForm(project) : ""],
+    history: ["Nuova voce timeline", project ? historyForm(project) : ""],
     taskDetail: ["Vista avanzata task", taskDetailForm()],
     historyDetail: ["Modifica voce scadenzario", historyDetailForm()],
   };
@@ -1403,6 +1517,14 @@ function adminProjectDetail() {
     `;
   }
   const projectDocuments = state.data.documents.filter((doc) => doc.projectId === project.id);
+  const projectDocumentFolders = [
+    ...state.data.documentFolders.filter((folder) => folder.projectId === project.id),
+    {
+      id: "client-uploads",
+      name: "Documenti caricati dal cliente",
+      description: "Invii collegati a questo progetto e cliente",
+    },
+  ];
   return `
     <div class="topbar project-topbar">
       <div>
@@ -1423,10 +1545,9 @@ function adminProjectDetail() {
         </div>
         <div class="section-grid">
           <div class="read-zone">
-            ${nextActionPanel(project)}
             <section class="panel">
-              <div class="panel-header"><h2>Dati progetto</h2><span class="readonly-pill">Vista</span></div>
-              <div class="panel-body">
+              <div class="panel-header"><h2>Dati progetto</h2>${visibilityBadge(false)}</div>
+              <div class="panel-body overview-split">
                 <dl class="info-table">
                   <dt>Cliente</dt><dd>${escapeHtml(project.client)}</dd>
                   <dt>Indirizzo</dt><dd>${escapeHtml(project.address)}</dd>
@@ -1436,9 +1557,9 @@ function adminProjectDetail() {
                   <dt>Compenso tecnico</dt><dd>${formatEuro(project.technicalFee)}</dd>
                   <dt>Aggiornato</dt><dd>${escapeHtml(project.updatedAt)}</dd>
                 </dl>
+                ${projectPhotoStrip(project)}
               </div>
             </section>
-            ${projectPhotoGallery(project)}
           </div>
           <div class="write-zone">
             <section class="panel action-panel">
@@ -1452,11 +1573,6 @@ function adminProjectDetail() {
                 <div class="field"><label>Importo lavori</label><input name="workAmount" type="number" min="0" value="${escapeHtml(project.workAmount || 0)}" /></div>
                 <div class="field"><label>Compenso tecnico</label><input name="technicalFee" type="number" min="0" value="${escapeHtml(project.technicalFee || 0)}" /></div>
                 <div class="field wide"><label>Fase</label><input name="phase" value="${escapeHtml(project.phase)}" /></div>
-                <div class="field wide"><label>Prossima azione</label><textarea name="nextAction">${escapeHtml(project.nextAction || "")}</textarea></div>
-                <div class="field"><label>A carico di</label><select name="nextActionOwner">
-                  ${["Studio", "Cliente", "Nessuno"].map((owner) => `<option ${project.nextActionOwner === owner ? "selected" : ""}>${owner}</option>`).join("")}
-                </select></div>
-                <div class="field"><label>Scadenza</label><input name="nextActionDue" value="${escapeHtml(project.nextActionDue || "")}" /></div>
                 <div class="field wide"><label>Descrizione</label><textarea name="description">${escapeHtml(project.description)}</textarea></div>
                 <div class="field wide"><label>Foto progetto</label><input name="projectPhotosPreview" type="file" accept="image/*" multiple data-photo-input /></div>
                 <div class="field wide"><div class="photo-grid compact" data-photo-preview></div></div>
@@ -1479,7 +1595,7 @@ function adminProjectDetail() {
         <div class="section-grid">
           <div class="read-zone">
             <section class="panel">
-              <div class="panel-header"><h2>Checklist progetto</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-header"><h2>Checklist progetto</h2>${visibilityBadge(false)}</div>
               <div class="panel-body checklist">${checklistRows(project.id)}</div>
             </section>
           </div>
@@ -1506,7 +1622,7 @@ function adminProjectDetail() {
         <div class="section-grid">
           <div class="read-zone">
             <section class="panel">
-              <div class="panel-header"><h2>Richieste pubblicate</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-header"><h2>Richieste pubblicate</h2>${visibilityBadge(true)}</div>
               <div class="panel-body request-list">${requestRows(project.id)}</div>
             </section>
           </div>
@@ -1540,8 +1656,11 @@ function adminProjectDetail() {
         <div class="section-grid">
           <div class="read-zone">
             <section class="panel">
-              <div class="panel-header"><h2>Documenti del progetto</h2><span class="readonly-pill">Vista</span></div>
-              <div class="panel-body document-list">${documentRows(projectDocuments, project.id)}</div>
+              <div class="panel-header"><h2>Documenti del progetto</h2>${visibilityBadge(true, "Visibile/nascosto per file")}</div>
+              <div class="panel-body document-list">${documentRows(projectDocuments, project.id, {
+                folders: projectDocumentFolders,
+                folderResolver: (doc) => (doc.source === "Cliente" ? "client-uploads" : doc.folderId || ""),
+              })}</div>
             </section>
           </div>
           <div class="write-zone stacked-actions">
@@ -1579,18 +1698,17 @@ function adminProjectDetail() {
       <section class="project-section schedule-section" id="admin-schedule">
         <div class="section-heading">
           <span>↗</span>
-          <div><h2>Scadenzario e aggiornamenti</h2><p>Timeline, eventi e visibilita' cliente gestiti in un unico punto.</p></div>
+          <div><h2>Timeline</h2><p>Storico, scadenze e appuntamenti gestiti in un unico punto.</p></div>
           <div class="section-actions split-actions">
             <button class="button secondary" data-admin-schedule-view="timeline">Timeline</button>
             <button class="button secondary" data-admin-schedule-view="calendar">Calendario</button>
-            <button class="button secondary" data-admin-modal="timeline">Nuovo aggiornamento</button>
-            <button class="button" data-admin-modal="event">Nuova scadenza</button>
+            <button class="button" data-admin-modal="history">Aggiungi voce</button>
           </div>
         </div>
         <div class="section-grid">
           <div class="read-zone">
             <section class="panel">
-              <div class="panel-header"><h2>Storico e prossime scadenze</h2><span class="readonly-pill">Vista operativa</span></div>
+              <div class="panel-header"><h2>Storico e prossime attivita'</h2>${visibilityBadge(true, "Visibile/nascosto per voce")}</div>
               <div class="panel-body">${adminSchedulePanel(project.id)}</div>
             </section>
           </div>
@@ -1612,12 +1730,12 @@ function adminProjectDetail() {
         <div class="section-heading">
           <span>□</span>
           <div><h2>Calendario</h2><p>Scadenze presenti e creazione di nuovi appuntamenti o promemoria.</p></div>
-          <div class="section-actions"><button class="button secondary" data-admin-modal="event">Nuova scadenza</button></div>
+          <div class="section-actions"><button class="button secondary" data-admin-modal="history">Aggiungi voce</button></div>
         </div>
         <div class="section-grid">
           <div class="read-zone">
             <section class="panel">
-              <div class="panel-header"><h2>Scadenze progetto</h2><span class="readonly-pill">Vista</span></div>
+              <div class="panel-header"><h2>Scadenze progetto</h2>${visibilityBadge(true, "Visibile/nascosto per voce")}</div>
               <div class="panel-body event-list">${eventRows(project.id)}</div>
             </section>
           </div>
@@ -1644,12 +1762,16 @@ function adminProjectDetail() {
 
 function adminDocuments() {
   const selectedProject = state.documentFilters.projectId || state.selectedProjectId;
-  const selectedFolder = state.data.documentFolders.find((folder) => folder.projectId === selectedProject)?.id || "";
+  const selectedProjectData = state.data.projects.find((project) => project.id === selectedProject) || currentProject();
   return `
     <div class="topbar">
       <div>
         <h1>Documenti</h1>
         <p>Archivio documentale organizzato per cliente, progetto e cartella, con ricerca e filtri operativi.</p>
+      </div>
+      <div class="toolbar">
+        <button class="button secondary" data-admin-modal="folder">Crea cartella</button>
+        <button class="button" data-admin-modal="document">Carica documento</button>
       </div>
     </div>
     <div class="project-console">
@@ -1662,7 +1784,7 @@ function adminDocuments() {
           <form class="panel-body form-grid document-filters" data-document-filters>
             <div class="field wide"><label>Ricerca libera</label><input name="search" value="${escapeHtml(state.documentFilters.search)}" placeholder="Cerca documento, cliente, progetto, cartella o tag" /></div>
             <div class="field"><label>Cliente</label><select name="clientId">${documentFilterOptions(state.data.clients, state.documentFilters.clientId, "Tutti i clienti")}</select></div>
-            <div class="field"><label>Progetto</label><select name="projectId">${documentFilterOptions(state.data.projects, state.documentFilters.projectId, "Tutti i progetti", "id", "title")}</select></div>
+            <div class="field"><label>Progetto</label><select name="projectId">${documentFilterProjectOptions()}</select></div>
             <div class="field"><label>Cartella</label><select name="folderId">${documentFilterFolderOptions()}</select></div>
             <div class="field"><label>Stato documento</label><select name="status">
               <option value="">Tutti gli stati</option>
@@ -1671,92 +1793,12 @@ function adminDocuments() {
           </form>
         </section>
         <section class="panel">
-          <div class="panel-header"><h2>Documenti per cliente e progetto</h2><span class="readonly-pill">Vista</span></div>
+          <div class="panel-header"><h2>Documenti per cliente e progetto</h2>${visibilityBadge(true, "Visibile/nascosto per file")}</div>
           <div class="panel-body document-list">${documentExplorer()}</div>
         </section>
-        <section class="panel">
-          <div class="panel-header"><h2>Documenti caricati dal cliente</h2><span class="readonly-pill">Sezione separata</span></div>
-          <div class="panel-body document-list">${uploadedByClientExplorer()}</div>
-        </section>
-      </section>
-
-      <section class="project-section">
-        <div class="section-heading">
-          <span>▣</span>
-          <div><h2>Caricamento documenti</h2><p>Le cartelle vuote restano visibili e i documenti aggiornabili sono filtrati dalla cartella scelta.</p></div>
-        </div>
-        <div class="section-grid">
-          <div class="read-zone">
-            <section class="panel">
-              <div class="panel-header"><h2>Cartelle del progetto selezionato</h2><span class="readonly-pill">Vista</span></div>
-              <div class="panel-body document-list">${documentRows(studioDocuments().filter((doc) => doc.projectId === selectedProject), selectedProject)}</div>
-            </section>
-          </div>
-          <div class="write-zone stacked-actions">
-            <section class="panel action-panel">
-              <div class="panel-header"><h2>Nuova cartella</h2><span class="edit-pill">Gestione</span></div>
-              <form class="panel-body form-grid" data-form="documentFolder">
-                <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions(selectedProject)}</select></div>
-                <div class="field wide"><label>Nome cartella</label><input name="name" placeholder="es. Pratiche comunali" required /></div>
-                <div class="field wide"><label>Descrizione</label><input name="description" /></div>
-                <button class="button wide" type="submit">Crea cartella</button>
-              </form>
-            </section>
-            <section class="panel action-panel">
-              <div class="panel-header"><h2>Nuovo documento</h2><span class="edit-pill">Gestione</span></div>
-              <form class="panel-body form-grid" data-form="document">
-                <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions(selectedProject)}</select></div>
-                <div class="field wide"><label>Cartella</label><select name="folderId">${documentFolderOptions(selectedProject)}</select></div>
-                <div class="field wide"><label>Aggiorna documento esistente</label><select name="parentDocumentId">${documentVersionOptions(selectedProject, selectedFolder)}</select></div>
-                <div class="field wide"><label>Nome documento</label><input name="title" required /></div>
-                <div class="field wide"><label>File</label><input name="file" type="file" /></div>
-                <div class="field"><label>Versione</label><input name="version" value="v1.0" /></div>
-                <div class="field"><label>Stato</label><select name="documentStatus"><option>Provvisorio</option><option>Bozza</option><option>Definitivo</option></select></div>
-                <div class="field wide"><label>Commento breve</label><input name="comment" placeholder="Nota sintetica sul documento" /></div>
-                <div class="field wide"><label>Tag</label><input name="tags" list="tagSuggestions" placeholder="es. comune, antincendio, definitivo" /></div>
-                <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
-                <div class="field wide checkbox-field"><label><input name="notifyChat" type="checkbox" value="true" /> Notifica al cliente via chat WhatsApp/SMS</label></div>
-                <div class="field wide checkbox-field"><label><input name="notifyEmail" type="checkbox" value="true" checked /> Notifica al cliente via mail</label></div>
-                <button class="button wide" type="submit">Registra documento</button>
-              </form>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <section class="project-section">
-        <div class="section-heading">
-          <span>↗</span>
-          <div><h2>Aggiornamenti e scadenze</h2><p>Pubblicazioni rapide per il progetto selezionato.</p></div>
-        </div>
-        <div class="section-grid even">
-          <div class="write-zone">
-            <section class="panel action-panel">
-              <div class="panel-header"><h2>Nuovo aggiornamento timeline</h2><span class="edit-pill">Gestione</span></div>
-              <form class="panel-body form-grid" data-form="timeline">
-                <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
-                <div class="field wide"><label>Titolo</label><input name="title" required /></div>
-                <div class="field wide"><label>Testo</label><textarea name="body" required></textarea></div>
-                <button class="button wide" type="submit">Pubblica aggiornamento</button>
-              </form>
-            </section>
-          </div>
-          <div class="write-zone">
-            <section class="panel action-panel">
-              <div class="panel-header"><h2>Nuova scadenza</h2><span class="edit-pill">Gestione</span></div>
-              <form class="panel-body form-grid" data-form="event">
-                <div class="field wide"><label>Progetto</label><select name="projectId">${projectOptions()}</select></div>
-                <div class="field"><label>Giorno</label><input name="day" maxlength="2" placeholder="07" required /></div>
-                <div class="field"><label>Mese</label><input name="month" maxlength="3" placeholder="MAG" required /></div>
-                <div class="field wide"><label>Titolo</label><input name="title" required /></div>
-                <div class="field wide"><label>Nota</label><textarea name="note"></textarea></div>
-                <button class="button wide" type="submit">Aggiungi scadenza</button>
-              </form>
-            </section>
-          </div>
-        </div>
       </section>
     </div>
+    ${adminModalContent(selectedProjectData)}
     ${tagDatalist()}
   `;
 }
@@ -1766,7 +1808,7 @@ function adminClients() {
     <div class="topbar">
       <div>
         <h1>Clienti e accessi</h1>
-        <p>Crea accessi personali e collega ogni cliente ai propri progetti.</p>
+        <p>Rubrica CRM interna: accessi cliente, dati amministrativi e note riservate allo studio.</p>
       </div>
     </div>
     <div class="grid two">
@@ -1777,8 +1819,15 @@ function adminClients() {
             .map(
               (client) => `
             <div class="row-item">
-              <span><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.email)} · ${escapeHtml(client.phone)}</span></span>
-              <span class="status progress">Accesso cliente</span>
+              <span>
+                <strong>${escapeHtml(client.name)}</strong>
+                <span>${escapeHtml(client.email)} · ${escapeHtml(client.phone)}</span>
+                <span>${escapeHtml([client.clientType, client.city, client.crmStatus].filter(Boolean).join(" · "))}</span>
+              </span>
+              <span class="split-actions">
+                ${visibilityBadge(false, "Dati CRM interni")}
+                <span class="status progress">Accesso cliente</span>
+              </span>
             </div>
           `,
             )
@@ -1786,13 +1835,29 @@ function adminClients() {
         </div>
       </section>
       <section class="panel">
-        <div class="panel-header"><h2>Nuovo cliente</h2></div>
+        <div class="panel-header"><h2>Nuovo cliente</h2>${visibilityBadge(false, "CRM interno")}</div>
         <form class="panel-body form-grid" data-form="client">
           <div class="field wide"><label>Nome cliente</label><input name="name" required /></div>
+          <div class="field"><label>Tipologia</label><select name="clientType"><option>Privato</option><option>Azienda</option><option>Condominio</option><option>Ente</option></select></div>
+          <div class="field"><label>Ragione sociale</label><input name="companyName" /></div>
           <div class="field"><label>Email</label><input name="email" type="email" required /></div>
           <div class="field"><label>Telefono</label><input name="phone" /></div>
+          <div class="field"><label>Codice fiscale</label><input name="taxCode" /></div>
+          <div class="field"><label>Partita IVA</label><input name="vatNumber" /></div>
+          <div class="field"><label>PEC</label><input name="pec" type="email" /></div>
+          <div class="field"><label>Codice SDI</label><input name="billingCode" /></div>
+          <div class="field wide"><label>Indirizzo</label><input name="address" /></div>
+          <div class="field"><label>Citta'</label><input name="city" /></div>
+          <div class="field"><label>Provincia</label><input name="province" /></div>
+          <div class="field"><label>CAP</label><input name="zip" /></div>
+          <div class="field"><label>Fonte contatto</label><select name="leadSource"><option>Passaparola</option><option>Sito web</option><option>Cliente ricorrente</option><option>Partner</option><option>Altro</option></select></div>
+          <div class="field"><label>Stato CRM</label><select name="crmStatus"><option>Attivo</option><option>Lead</option><option>In valutazione</option><option>Sospeso</option><option>Archiviato</option></select></div>
+          <div class="field"><label>Referente interno</label><input name="internalOwner" value="Studio" /></div>
+          <div class="field"><label>Privacy/GDPR</label><select name="privacyStatus"><option>Da verificare</option><option>Consenso ricevuto</option><option>Documenti mancanti</option></select></div>
           <div class="field"><label>Username</label><input name="username" required /></div>
           <div class="field"><label>Password temporanea</label><input name="password" required /></div>
+          <div class="field wide"><label>Note interne studio</label><textarea name="internalNotes" placeholder="Informazioni non visibili al cliente"></textarea></div>
+          <div class="field wide"><label>Nota pubblicabile</label><textarea name="publicNotes" placeholder="Eventuale nota condivisibile, non mostrata finche' non viene usata nel portale"></textarea></div>
           <button class="button wide" type="submit">Crea cliente e accesso</button>
         </form>
       </section>
@@ -2030,7 +2095,18 @@ function bindWorkspaceActions() {
     });
     filterForm.addEventListener("change", () => {
       const values = formValues(filterForm);
+      if (values.clientId !== state.documentFilters.clientId) {
+        const allowedProjects = state.data.projects.filter((project) => !values.clientId || project.clientId === values.clientId);
+        if (!allowedProjects.some((project) => project.id === values.projectId)) values.projectId = "";
+        values.folderId = "";
+      }
       if (values.projectId !== state.documentFilters.projectId) values.folderId = "";
+      const allowedProjectIds = state.data.projects
+        .filter((project) => (!values.clientId || project.clientId === values.clientId) && (!values.projectId || project.id === values.projectId))
+        .map((project) => project.id);
+      if (values.folderId && !state.data.documentFolders.some((folder) => folder.id === values.folderId && allowedProjectIds.includes(folder.projectId))) {
+        values.folderId = "";
+      }
       state.documentFilters = { ...state.documentFilters, ...values };
       renderWorkspace();
     });
@@ -2041,10 +2117,57 @@ function formValues(form) {
   return Object.fromEntries([...new FormData(form).entries()].filter(([, value]) => !(value instanceof File)));
 }
 
+function datePartsFromTimelineDate(value = "") {
+  const parts = value.trim().split(/\s+/);
+  const day = (parts[0] || "").replace(/\D/g, "").padStart(2, "0").slice(-2) || "01";
+  const month = (parts[1] || "MAG").slice(0, 3).toUpperCase();
+  return { day, month };
+}
+
+async function submitHistoryForm(form) {
+  const values = formValues(form);
+  const dateLabel = values.time ? `${values.date} · ${values.time}` : values.date;
+  if (values.kind === "Scadenza") {
+    const { day, month } = datePartsFromTimelineDate(values.date);
+    await api("/api/events", {
+      method: "POST",
+      body: JSON.stringify({
+        projectId: values.projectId,
+        day,
+        month,
+        title: values.title,
+        note: values.time ? `${values.body} Ora: ${values.time}` : values.body,
+        color: values.color || "#c78734",
+        visibility: values.visibility,
+      }),
+    });
+    return;
+  }
+  await api("/api/timeline", {
+    method: "POST",
+    body: JSON.stringify({
+      projectId: values.projectId,
+      date: dateLabel,
+      title: values.title,
+      body: values.body,
+      color: values.color || "#2f6f6d",
+      visibility: values.visibility,
+    }),
+  });
+}
+
 function refreshDocumentFormOptions(form) {
+  const clientSelect = form.querySelector("[name='clientId']");
   const projectSelect = form.querySelector("[name='projectId']");
   const folderSelect = form.querySelector("[name='folderId']");
   const versionSelect = form.querySelector("[name='parentDocumentId']");
+  if (clientSelect && projectSelect) {
+    const currentProject = projectSelect.value;
+    projectSelect.innerHTML = projectOptions(currentProject, clientSelect.value);
+    if (![...projectSelect.options].some((option) => option.value === currentProject)) {
+      projectSelect.value = projectSelect.options[0]?.value || "";
+    }
+  }
   const projectId = projectSelect?.value || state.selectedProjectId || "";
   if (!projectId) return;
 
@@ -2063,6 +2186,7 @@ function refreshDocumentFormOptions(form) {
 
 function bindDocumentFormControls(form) {
   refreshDocumentFormOptions(form);
+  form.querySelector("[name='clientId']")?.addEventListener("change", () => refreshDocumentFormOptions(form));
   form.querySelector("[name='projectId']")?.addEventListener("change", () => refreshDocumentFormOptions(form));
   form.querySelector("[name='folderId']")?.addEventListener("change", () => refreshDocumentFormOptions(form));
 }
@@ -2131,6 +2255,11 @@ function scrollToPendingSection() {
   target?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+function scrollTimelineToNext() {
+  const target = document.querySelector("[data-history-focus='true']");
+  target?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+}
+
 function bindAdminForms() {
   const endpoints = {
     project: "/api/projects",
@@ -2169,6 +2298,8 @@ function bindAdminForms() {
             method: "PATCH",
             body: JSON.stringify(formValues(form)),
           });
+        } else if (type === "history") {
+          await submitHistoryForm(form);
         } else if (type === "document") {
           await api(endpoints[type], {
             method: "POST",

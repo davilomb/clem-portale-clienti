@@ -200,9 +200,17 @@ function clientVisibleDb(db, user) {
 
   const projects = db.projects.filter((project) => project.clientId === user.clientId);
   const ids = new Set(projects.map((project) => project.id));
+  const clients = db.clients
+    .filter((client) => client.id === user.clientId)
+    .map((client) => ({
+      id: client.id,
+      name: client.name,
+      email: client.email,
+      phone: client.phone,
+    }));
   return {
     users: [],
-    clients: db.clients.filter((client) => client.id === user.clientId),
+    clients,
     projects,
     documents: db.documents.filter(
       (document) => ids.has(document.projectId) && document.visibility === "Cliente",
@@ -265,6 +273,21 @@ function fromSnake(row) {
     role: row.role,
     email: row.email,
     phone: row.phone,
+    companyName: row.company_name,
+    clientType: row.client_type,
+    taxCode: row.tax_code,
+    vatNumber: row.vat_number,
+    pec: row.pec,
+    billingCode: row.billing_code,
+    city: row.city,
+    province: row.province,
+    zip: row.zip,
+    leadSource: row.lead_source,
+    crmStatus: row.crm_status,
+    internalOwner: row.internal_owner,
+    privacyStatus: row.privacy_status,
+    internalNotes: row.internal_notes,
+    publicNotes: row.public_notes,
     clientId: row.client_id,
     projectId: row.project_id,
     folderId: row.folder_id,
@@ -942,6 +965,22 @@ async function handleApi(req, res) {
       name: payload.name,
       email: payload.email,
       phone: payload.phone || "",
+      companyName: payload.companyName || "",
+      clientType: payload.clientType || "Privato",
+      taxCode: payload.taxCode || "",
+      vatNumber: payload.vatNumber || "",
+      pec: payload.pec || "",
+      billingCode: payload.billingCode || "",
+      address: payload.address || "",
+      city: payload.city || "",
+      province: payload.province || "",
+      zip: payload.zip || "",
+      leadSource: payload.leadSource || "",
+      crmStatus: payload.crmStatus || "Attivo",
+      internalOwner: payload.internalOwner || "Studio",
+      privacyStatus: payload.privacyStatus || "Da verificare",
+      internalNotes: payload.internalNotes || "",
+      publicNotes: payload.publicNotes || "",
     });
     await store.insert("users", {
       id: `user-${slug(payload.username)}-${Date.now()}`,

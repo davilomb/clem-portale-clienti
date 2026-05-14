@@ -987,6 +987,15 @@ button {
   gap: 16px;
 }
 
+.main,
+.panel,
+.panel-body,
+.project-section,
+.section-grid,
+.read-zone {
+  min-width: 0;
+}
+
 .document-command-center {
   border-color: #bfd7ee;
   box-shadow: 0 16px 38px rgba(31, 41, 51, 0.06);
@@ -1004,15 +1013,33 @@ button {
   padding: 16px;
 }
 
+.timeline-next-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #cfe4e0;
+  border-radius: 8px;
+  background: #f4fbfa;
+  padding: 14px 16px;
+}
+
+.timeline-next-card strong {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
 .horizontal-timeline {
   position: relative;
   display: grid;
-  grid-auto-columns: minmax(260px, 34%);
+  width: 100%;
+  max-width: 100%;
+  grid-auto-columns: minmax(230px, 280px);
   grid-auto-flow: column;
   gap: 16px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 26px 2px 8px;
   scroll-snap-type: x mandatory;
+  scrollbar-gutter: stable;
 }
 
 .horizontal-timeline::before {
@@ -1029,12 +1056,29 @@ button {
   position: relative;
   display: grid;
   gap: 8px;
+  min-width: 0;
   min-height: 168px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
   padding: 28px 16px 16px;
   scroll-snap-align: start;
+}
+
+.admin-schedule {
+  display: grid;
+  gap: 14px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.admin-schedule .horizontal-timeline {
+  border-top: 1px solid #e1eceb;
+  padding-bottom: 14px;
+}
+
+.schedule-section .panel-body {
+  overflow: hidden;
 }
 
 .timeline-dot {
@@ -1372,6 +1416,41 @@ button {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.overview-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  gap: 18px;
+  align-items: start;
+}
+
+.project-photo-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.project-photo-strip figure {
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.project-photo-strip img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.project-photo-strip figcaption {
+  padding: 7px 9px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .timeline-entry {
@@ -1725,6 +1804,10 @@ button {
 }
 
 @media (max-width: 980px) {
+  .overview-split {
+    grid-template-columns: 1fr;
+  }
+
   .site-header {
     grid-template-columns: auto 1fr;
     gap: 10px 14px;

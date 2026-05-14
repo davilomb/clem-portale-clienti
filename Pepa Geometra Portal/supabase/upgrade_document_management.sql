@@ -28,6 +28,24 @@ alter table public.requests
   add column if not exists requested_document_title text default '',
   add column if not exists uploaded_document_id text default '';
 
+alter table public.clients
+  add column if not exists company_name text default '',
+  add column if not exists client_type text default 'Privato',
+  add column if not exists tax_code text default '',
+  add column if not exists vat_number text default '',
+  add column if not exists pec text default '',
+  add column if not exists billing_code text default '',
+  add column if not exists address text default '',
+  add column if not exists city text default '',
+  add column if not exists province text default '',
+  add column if not exists zip text default '',
+  add column if not exists lead_source text default '',
+  add column if not exists crm_status text default 'Attivo',
+  add column if not exists internal_owner text default 'Studio',
+  add column if not exists privacy_status text default 'Da verificare',
+  add column if not exists internal_notes text default '',
+  add column if not exists public_notes text default '';
+
 create table if not exists public.notifications (
   id text primary key,
   project_id text not null references public.projects(id) on delete cascade,
