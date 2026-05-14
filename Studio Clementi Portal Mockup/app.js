@@ -15,7 +15,19 @@ const state = {
   hideCompletedTasks: false,
   adminScheduleView: "timeline",
   pendingScrollTarget: "",
+  modalScrollY: null,
   calendarView: "list",
+  notificationSettings: {
+    emailEnabled: true,
+    messageEnabled: false,
+    defaultEmail: true,
+    defaultMessage: false,
+    emailProvider: "Da configurare",
+    messageProvider: "Da configurare",
+    senderName: "Studio Clementi",
+    senderEmail: "info@studioclementi.it",
+    messageSender: "Studio Clementi",
+  },
   documentFilters: {
     search: "",
     clientId: "",
@@ -54,6 +66,7 @@ function icon(name) {
     calendar: "□",
     docs: "≡",
     users: "◉",
+    settings: "⚙",
   };
   return icons[name] || "•";
 }
@@ -417,6 +430,7 @@ function shell(content) {
         ["projects", "folder", "Progetti"],
         ["documents", "docs", "Documenti"],
         ["clients", "users", "Clienti"],
+        ["settings", "settings", "Settings"],
       ]
     : [
         ["overview", "home", "Home"],
@@ -519,12 +533,16 @@ function renderAdmin() {
     projectDetail: adminProjectDetail,
     documents: adminDocuments,
     clients: adminClients,
+    settings: adminSettings,
   };
   shell(views[state.route]());
   bindWorkspaceActions();
   bindAdminForms();
-  scrollToPendingSection();
-  setTimeout(scrollTimelineToNext, 80);
+  restoreModalScroll();
+  if (!state.adminModal) {
+    scrollToPendingSection();
+    setTimeout(scrollTimelineToNext, 80);
+  }
 }
 
 function renderClient() {
@@ -537,8 +555,11 @@ function renderClient() {
   shell(views[state.route]());
   bindWorkspaceActions();
   bindClientActions();
-  scrollToPendingSection();
-  setTimeout(scrollTimelineToNext, 80);
+  restoreModalScroll();
+  if (!state.uploadRequestId) {
+    scrollToPendingSection();
+    setTimeout(scrollTimelineToNext, 80);
+  }
 }
 
 function projectRows(projects) {
@@ -1302,8 +1323,33 @@ function checklistForm(project) {
       <input type="hidden" name="projectId" value="${escapeHtml(project.id)}" />
       <div class="field wide"><label>Voce</label><input name="label" required /></div>
       <div class="field wide"><label>Stato</label><select name="status"><option>Da fare</option><option>In corso</option><option>Completato</option></select></div>
+      ${notificationOptions("checklist")}
       <button class="button wide" type="submit">Aggiungi alla checklist</button>
     </form>
+  `;
+}
+
+function notificationOptions(context = "") {
+  const settings = state.notificationSettings;
+  const emailChecked = settings.defaultEmail && settings.emailEnabled ? "checked" : "";
+  const messageChecked = settings.defaultMessage && settings.messageEnabled ? "checked" : "";
+  const emailDisabled = settings.emailEnabled ? "" : "disabled";
+  const messageDisabled = settings.messageEnabled ? "" : "disabled";
+  return `
+    <fieldset class="notification-options wide">
+      <legend>Notifiche dimostrative</legend>
+      <label class="toggle-row">
+        <input name="notifyEmail" type="checkbox" value="true" ${emailChecked} ${emailDisabled} />
+        <span>Invia mail al cliente</span>
+        <small>${settings.emailEnabled ? "Canale grafico pronto, invio reale da configurare" : "Disabilitato nei settings"}</small>
+      </label>
+      <label class="toggle-row">
+        <input name="notifyChat" type="checkbox" value="true" ${messageChecked} ${messageDisabled} />
+        <span>Invia messaggio al cliente</span>
+        <small>${settings.messageEnabled ? "WhatsApp/SMS solo predisposto" : "Disabilitato nei settings"}</small>
+      </label>
+      <input type="hidden" name="notificationContext" value="${escapeHtml(context)}" />
+    </fieldset>
   `;
 }
 
@@ -1317,6 +1363,7 @@ function requestForm(project) {
       <div class="field"><label>Scadenza</label><input name="dueDate" value="Da definire" /></div>
       <div class="field wide checkbox-field"><label><input name="uploadRequired" type="checkbox" value="true" /> Richiedi caricamento documento</label></div>
       <div class="field wide"><label>Documento richiesto</label><input name="requestedDocumentTitle" placeholder="es. Documento di identita', visura, delega firmata" /></div>
+      ${notificationOptions("request")}
       <button class="button wide" type="submit">Pubblica richiesta</button>
     </form>
   `;
@@ -1351,6 +1398,7 @@ function documentForm(project) {
       <div class="field wide"><label>Commento breve</label><input name="comment" placeholder="Nota sintetica sul documento" /></div>
       <div class="field wide"><label>Tag</label><input name="tags" list="tagSuggestions" placeholder="es. comune, antincendio, definitivo" /></div>
       <div class="field wide"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
+      ${notificationOptions("document")}
       <button class="button wide" type="submit">Registra documento</button>
     </form>
   `;
@@ -1364,6 +1412,7 @@ function timelineForm(project) {
       <div class="field wide"><label>Testo</label><textarea name="body" required></textarea></div>
       <div class="field"><label>Colore</label><input name="color" type="color" value="#2f6f6d" /></div>
       <div class="field"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
+      ${notificationOptions("timeline")}
       <button class="button wide" type="submit">Pubblica aggiornamento</button>
     </form>
   `;
@@ -1379,6 +1428,7 @@ function eventForm(project) {
       <div class="field wide"><label>Nota</label><textarea name="note"></textarea></div>
       <div class="field"><label>Colore</label><input name="color" type="color" value="#c78734" /></div>
       <div class="field"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
+      ${notificationOptions("event")}
       <button class="button wide" type="submit">Aggiungi scadenza</button>
     </form>
   `;
@@ -1395,6 +1445,7 @@ function historyForm(project) {
       <div class="field wide"><label>Descrizione</label><textarea name="body" required></textarea></div>
       <div class="field"><label>Colore</label><input name="color" type="color" value="#2f6f6d" /></div>
       <div class="field"><label>Visibilita'</label><select name="visibility"><option>Cliente</option><option>Interno</option></select></div>
+      ${notificationOptions("history")}
       <button class="button wide" type="submit">Aggiungi alla timeline</button>
     </form>
   `;
@@ -1410,6 +1461,7 @@ function taskDetailForm() {
         ${["Da fare", "In corso", "Completato"].map((status) => `<option ${task.status === status ? "selected" : ""}>${status}</option>`).join("")}
       </select></div>
       <div class="field wide"><label>Note interne</label><textarea name="notes" placeholder="Appunti interni non visibili al cliente">${escapeHtml(task.notes || "")}</textarea></div>
+      ${notificationOptions("task")}
       <button class="button" type="submit">Salva task</button>
       <button class="button secondary danger-button" data-delete-record="checklist:${escapeHtml(task.id)}" type="button">Elimina task</button>
     </form>
@@ -1428,6 +1480,7 @@ function historyDetailForm() {
       <div class="field wide"><label>Testo</label><textarea name="${isEvent ? "note" : "body"}">${escapeHtml(isEvent ? item.note : item.body)}</textarea></div>
       <div class="field"><label>Colore</label><input name="color" type="color" value="${escapeHtml(item.color || (isEvent ? "#c78734" : "#2f6f6d"))}" /></div>
       <div class="field"><label>Visibilita'</label><select name="visibility"><option ${item.visibility !== "Interno" ? "selected" : ""}>Cliente</option><option ${item.visibility === "Interno" ? "selected" : ""}>Interno</option></select></div>
+      ${notificationOptions(isEvent ? "eventUpdate" : "timelineUpdate")}
       <button class="button" type="submit">Salva voce</button>
       <button class="button secondary danger-button" data-delete-record="${isEvent ? "events" : "timeline"}:${escapeHtml(item.id)}" type="button">Elimina voce</button>
     </form>
@@ -1865,6 +1918,61 @@ function adminClients() {
   `;
 }
 
+function adminSettings() {
+  const settings = state.notificationSettings;
+  return `
+    <div class="topbar">
+      <div>
+        <h1>Settings</h1>
+        <p>Configurazione grafica dei canali di notifica. L'invio reale verra' collegato in una fase successiva.</p>
+      </div>
+    </div>
+    <div class="grid two">
+      <section class="panel">
+        <div class="panel-header"><h2>Canali notifiche</h2><span class="readonly-pill">Mockup</span></div>
+        <form class="panel-body form-grid" data-notification-settings>
+          <div class="field wide checkbox-field"><label><input name="emailEnabled" type="checkbox" value="true" ${settings.emailEnabled ? "checked" : ""} /> Abilita notifiche email</label></div>
+          <div class="field wide checkbox-field"><label><input name="messageEnabled" type="checkbox" value="true" ${settings.messageEnabled ? "checked" : ""} /> Abilita notifiche messaggio WhatsApp/SMS</label></div>
+          <div class="field wide checkbox-field"><label><input name="defaultEmail" type="checkbox" value="true" ${settings.defaultEmail ? "checked" : ""} /> Seleziona email di default nei popup</label></div>
+          <div class="field wide checkbox-field"><label><input name="defaultMessage" type="checkbox" value="true" ${settings.defaultMessage ? "checked" : ""} /> Seleziona messaggio di default nei popup</label></div>
+          <div class="field"><label>Provider email</label><select name="emailProvider">
+            ${["Da configurare", "Brevo", "Resend", "SendGrid"].map((item) => `<option ${settings.emailProvider === item ? "selected" : ""}>${item}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Provider messaggi</label><select name="messageProvider">
+            ${["Da configurare", "WhatsApp Cloud API", "Twilio", "Brevo Conversations"].map((item) => `<option ${settings.messageProvider === item ? "selected" : ""}>${item}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Mittente email</label><input name="senderName" value="${escapeHtml(settings.senderName)}" /></div>
+          <div class="field"><label>Email mittente</label><input name="senderEmail" value="${escapeHtml(settings.senderEmail)}" /></div>
+          <div class="field wide"><label>Nome mittente messaggi</label><input name="messageSender" value="${escapeHtml(settings.messageSender)}" /></div>
+          <button class="button wide" type="submit">Salva impostazioni mockup</button>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="panel-header"><h2>Template notifiche</h2><span class="readonly-pill">Solo grafica</span></div>
+        <div class="panel-body settings-preview">
+          <article>
+            <strong>Nuovo documento pubblicato</strong>
+            <p>Avvisa il cliente quando un documento visibile viene caricato o aggiornato.</p>
+            <span class="visibility-pill visible">Email</span>
+            <span class="visibility-pill hidden">Messaggio</span>
+          </article>
+          <article>
+            <strong>Nuova richiesta al cliente</strong>
+            <p>Avvisa il cliente quando lo studio pubblica una richiesta o richiede un caricamento.</p>
+            <span class="visibility-pill visible">Email</span>
+            <span class="visibility-pill hidden">Messaggio</span>
+          </article>
+          <article>
+            <strong>Timeline e task</strong>
+            <p>Predisposizione per notificare aggiornamenti, scadenze e task visibili al cliente.</p>
+            <span class="status waiting">Da collegare</span>
+          </article>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 function clientOverview() {
   const project = currentProject();
   return `
@@ -2012,12 +2120,14 @@ function bindWorkspaceActions() {
 
   document.querySelectorAll("[data-admin-modal]").forEach((button) => {
     button.addEventListener("click", () => {
+      state.modalScrollY = window.scrollY;
       state.adminModal = button.dataset.adminModal;
       renderWorkspace();
     });
   });
 
   document.querySelector("[data-close-admin-modal]")?.addEventListener("click", () => {
+    state.modalScrollY = window.scrollY;
     state.adminModal = "";
     state.selectedTaskId = "";
     state.selectedHistoryId = "";
@@ -2034,6 +2144,7 @@ function bindWorkspaceActions() {
     element.addEventListener("click", (event) => {
       if (event.target.closest("select, button")) return;
       state.selectedTaskId = element.dataset.taskDetail;
+      state.modalScrollY = window.scrollY;
       state.adminModal = "taskDetail";
       renderWorkspace();
     });
@@ -2042,6 +2153,7 @@ function bindWorkspaceActions() {
   document.querySelectorAll("[data-task-open]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedTaskId = button.dataset.taskOpen;
+      state.modalScrollY = window.scrollY;
       state.adminModal = "taskDetail";
       renderWorkspace();
     });
@@ -2062,6 +2174,7 @@ function bindWorkspaceActions() {
     element.addEventListener("click", () => {
       state.selectedHistoryType = element.dataset.historyType;
       state.selectedHistoryId = element.dataset.historyId;
+      state.modalScrollY = window.scrollY;
       state.adminModal = "historyDetail";
       renderWorkspace();
     });
@@ -2085,6 +2198,24 @@ function bindWorkspaceActions() {
       await loadBootstrap();
       renderWorkspace();
     });
+  });
+
+  document.querySelector("[data-notification-settings]")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = formValues(form);
+    state.notificationSettings = {
+      emailEnabled: Boolean(values.emailEnabled),
+      messageEnabled: Boolean(values.messageEnabled),
+      defaultEmail: Boolean(values.defaultEmail),
+      defaultMessage: Boolean(values.defaultMessage),
+      emailProvider: values.emailProvider || "Da configurare",
+      messageProvider: values.messageProvider || "Da configurare",
+      senderName: values.senderName || "Studio Clementi",
+      senderEmail: values.senderEmail || "",
+      messageSender: values.messageSender || "Studio Clementi",
+    };
+    renderWorkspace();
   });
 
   const filterForm = document.querySelector("[data-document-filters]");
@@ -2215,12 +2346,14 @@ function bindPhotoPreviews() {
 function bindClientActions() {
   document.querySelectorAll("[data-upload-request]").forEach((button) => {
     button.addEventListener("click", () => {
+      state.modalScrollY = window.scrollY;
       state.uploadRequestId = button.dataset.uploadRequest;
       renderWorkspace();
     });
   });
 
   document.querySelector("[data-close-modal]")?.addEventListener("click", () => {
+    state.modalScrollY = window.scrollY;
     state.uploadRequestId = null;
     renderWorkspace();
   });
@@ -2257,7 +2390,18 @@ function scrollToPendingSection() {
 
 function scrollTimelineToNext() {
   const target = document.querySelector("[data-history-focus='true']");
-  target?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  if (!target) return;
+  const container = target.closest(".horizontal-timeline");
+  if (!container) return;
+  const centeredLeft = target.offsetLeft - container.clientWidth / 2 + target.clientWidth / 2;
+  container.scrollTo({ left: Math.max(0, centeredLeft), behavior: "smooth" });
+}
+
+function restoreModalScroll() {
+  if (state.modalScrollY === null) return;
+  const targetY = state.modalScrollY;
+  requestAnimationFrame(() => window.scrollTo({ top: targetY, left: window.scrollX, behavior: "auto" }));
+  state.modalScrollY = null;
 }
 
 function bindAdminForms() {

@@ -821,7 +821,7 @@ async function handleApi(req, res) {
     await store.insert("timeline", {
       id: `time-${Date.now()}`,
       projectId: payload.projectId,
-      date: todayLabel(),
+      date: payload.date || todayLabel(),
       title: payload.title,
       body: payload.body,
       color: payload.color || "#2f6f6d",
@@ -941,14 +941,20 @@ async function handleApi(req, res) {
       uploadRequired: payload.uploadRequired === "true" || payload.uploadRequired === true,
       requestedDocumentTitle: payload.requestedDocumentTitle || "",
     });
-    await queueNotification(store, db, {
-      projectId: payload.projectId,
-      notificationType: "Nuova richiesta cliente",
-      relatedType: "request",
-      relatedId: requestId,
-      subject: "Nuova richiesta dallo studio",
-      message: `${payload.title}: ${payload.body}`,
-    });
+    const shouldNotifyByEmail = payload.notifyEmail === "true" || payload.notifyEmail === true;
+    const shouldNotifyByChat = payload.notifyChat === "true" || payload.notifyChat === true;
+    if (shouldNotifyByEmail || shouldNotifyByChat) {
+      const notificationBase = {
+        projectId: payload.projectId,
+        notificationType: "Nuova richiesta cliente",
+        relatedType: "request",
+        relatedId: requestId,
+        subject: "Nuova richiesta dallo studio",
+        message: `${payload.title}: ${payload.body}`,
+      };
+      if (shouldNotifyByEmail) await queueNotification(store, db, { ...notificationBase, channel: "Email" });
+      if (shouldNotifyByChat) await queueNotification(store, db, { ...notificationBase, channel: "WhatsApp/SMS" });
+    }
     sendJson(res, 201, { ok: true });
     return;
   }
