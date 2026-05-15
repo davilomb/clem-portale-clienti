@@ -121,45 +121,25 @@ function renderLanding() {
     <section class="hero">
       <div class="hero-copy">
         <span class="eyebrow">Portale cliente per studi tecnici</span>
-        <h1>Il cliente vede tutto chiaro. Il geometra lavora meglio.</h1>
+        <h1>Il cliente è tranquillo.<br />Il geometra lavora meglio.</h1>
         <p>
           InBolla trasforma la gestione della pratica in un’esperienza ordinata:
           documenti, scadenze e aggiornamenti sempre a portata di cliente.
         </p>
         <div class="hero-actions">
-          <a class="button large" href="#contatti">Contattaci</a>
-          <a class="button large secondary" href="${demoUrl()}">Guarda la demo</a>
+          <a class="button secondary" href="#contatti">Contattaci</a>
+          <a class="button" href="${demoUrl()}">Demo</a>
         </div>
       </div>
-      <div class="hero-product" aria-label="Anteprima piattaforma InBolla">
-        <img class="mascot" src="./assets/brand/inbolla-mascot.png" alt="" />
-        <div class="product-window">
-          <div class="window-bar"><span></span><span></span><span></span></div>
-          <div class="product-grid">
-            <div>
-              <small>Prossima azione</small>
-              <strong>Attesa protocollo comunale</strong>
-              <p>Scadenza: 07 Mag 2026</p>
-            </div>
-            <div>
-              <small>Documenti condivisi</small>
-              <strong>12</strong>
-              <p>Versioni e allegati ordinati</p>
-            </div>
-            <div>
-              <small>Stato pratica</small>
-              <strong>Work in progress</strong>
-              <p>Fase: pratica edilizia</p>
-            </div>
-          </div>
-        </div>
+      <div class="hero-screen" aria-label="Schermata reale area cliente InBolla">
+        <img src="./assets/screenshots/hero-cliente-reale.png" alt="Area cliente InBolla con dettagli progetto, stato, timeline e documenti" />
       </div>
     </section>
 
     <section class="statement-band">
       <article>
         <span>Per lo studio</span>
-        <h2>Pratiche ordinate. Informazioni sempre aggiornate.</h2>
+        <h2>Pratiche ordinate. Aggiornamenti pronti da condividere.</h2>
       </article>
       <article>
         <span>Per il cliente</span>
@@ -170,23 +150,23 @@ function renderLanding() {
     <section class="steps-section" id="come-funziona">
       <div class="section-title centered">
         <span class="eyebrow">Come funziona</span>
-        <h2>Tre passaggi semplici.</h2>
+        <h2>I vantaggi che InBolla ti fa raggiungere.</h2>
       </div>
       <div class="steps-grid">
         <article>
           <span>1</span>
-          <h3>Organizzi la pratica</h3>
-          <p>Stato, fase, documenti e scadenze sono raccolti in un unico spazio.</p>
+          <h3>Organizzi il lavoro</h3>
+          <p>Pratica, documenti, timeline, richieste e scadenze restano nello stesso spazio operativo.</p>
         </article>
         <article>
           <span>2</span>
-          <h3>Condividi ciò che serve</h3>
-          <p>Il cliente vede solo le informazioni utili, sempre ordinate e aggiornate.</p>
+          <h3>Fai sentire il cliente sempre aggiornato</h3>
+          <p>Ha tutto sotto controllo: stato, prossimi passaggi, file disponibili e richieste aperte sono sempre a portata di mano.</p>
         </article>
         <article>
           <span>3</span>
-          <h3>Riduci la confusione</h3>
-          <p>Meno telefonate ripetitive, meno documenti dispersi, più fiducia.</p>
+          <h3>Riduci la gestione relazionale</h3>
+          <p>Notifiche e informazioni sempre leggibili evitano rincorse, messaggi ripetuti e dubbi inutili.</p>
         </article>
       </div>
     </section>
@@ -194,46 +174,69 @@ function renderLanding() {
     <section class="screens-section" id="funzioni">
       <div class="section-title centered">
         <span class="eyebrow">Funzioni principali</span>
-        <h2>Prima chiarezza per il cliente. Poi controllo per lo studio.</h2>
       </div>
       <div class="feature-showcase">
         <article class="showcase-row">
-          <img src="./assets/screenshots/demo-cliente.png" alt="Area cliente InBolla" />
+          <img src="./assets/screenshots/hero-cliente-reale.png" alt="Area cliente InBolla con timeline e stato pratica" />
           <div>
             <span class="eyebrow">Valore cliente</span>
-            <h3>Il cliente entra e capisce subito.</h3>
-            <p>Vede cosa è successo, cosa manca, quali documenti sono disponibili e quali scadenze deve ricordare.</p>
+            <h3>Il cliente sa dove guardare.</h3>
+            <p>Trova stato della pratica, prossime attività, documenti, richieste e calendario senza dover chiedere ogni volta allo studio.</p>
           </div>
         </article>
         <article class="showcase-row reverse">
-          <img src="./assets/screenshots/demo-cruscotto.png" alt="Cruscotto studio InBolla" />
+          <img src="./assets/screenshots/geometra-timeline-reale.png" alt="Timeline progetto lato geometra InBolla" />
           <div>
-            <span class="eyebrow">Back office</span>
-            <h3>Lo studio mantiene tutto allineato.</h3>
-            <p>Il geometra aggiorna pratiche, documenti e scadenze da un punto unico, senza disperdere informazioni.</p>
+            <span class="eyebrow">Timeline e pianificazione</span>
+            <h3>Le scadenze diventano una traccia leggibile.</h3>
+            <p>Eventi, attività, aggiornamenti e prossimi passaggi restano agganciati alla pratica e possono essere mostrati al cliente quando serve.</p>
           </div>
         </article>
         <article class="showcase-row">
-          <img src="./assets/screenshots/demo-pratica.png" alt="Gestione pratica InBolla" />
+          <img src="./assets/screenshots/geometra-documenti-reale.png" alt="Gestione documentale progetto lato geometra InBolla" />
           <div>
-            <span class="eyebrow">Pratica</span>
-            <h3>Ogni pratica ha il suo spazio.</h3>
-            <p>Panoramica, checklist, richieste, documenti, timeline e calendario restano collegati alla pratica giusta.</p>
+            <span class="eyebrow">Documenti e richieste</span>
+            <h3>Ogni file ha il suo posto.</h3>
+            <p>Cartelle, documenti condivisi, caricamenti del cliente e richieste aperte rimangono ordinati nella pratica corretta.</p>
+          </div>
+        </article>
+        <article class="showcase-row notification-row">
+          <div>
+            <span class="eyebrow">Notifiche guidate</span>
+            <h3>Il cliente viene avvisato quando cambia qualcosa.</h3>
+            <p>Lo studio puo' predisporre notifiche per documenti, richieste, attività e aggiornamenti, così il cliente non resta mai fuori dal flusso.</p>
+          </div>
+          <div class="notification-mockup" aria-label="Mockup notifica WhatsApp InBolla">
+            <div class="phone-frame">
+              <div class="phone-header">
+                <span>InBolla</span>
+                <small>ora</small>
+              </div>
+              <div class="message-thread">
+                <div class="message-bubble">
+                  <strong>La planimetria e' stata aggiornata.</strong>
+                  <span>Apri InBolla per vedere la nuova versione nella pratica Ristrutturazione Villa Bianchi.</span>
+                </div>
+                <div class="message-meta">Documento condiviso dallo studio</div>
+              </div>
+            </div>
           </div>
         </article>
       </div>
     </section>
 
     <section class="premium-band">
-      <div>
-        <span class="eyebrow">Perché ti serve</span>
-        <h2>InBolla fa percepire meglio il valore del tuo lavoro e alleggerisce la gestione quotidiana del cliente.</h2>
-        <p>
-          Meno richieste ripetitive, meno documenti da rincorrere, più chiarezza su ogni pratica.
-          Il cliente trova risposte ordinate prima ancora di doverle chiedere.
-        </p>
+      <div class="premium-copy">
+        <div>
+          <span class="eyebrow">Perché ti serve</span>
+          <h2>InBolla rende evidente il valore del lavoro del geometra.</h2>
+          <p>
+            Non aggiunge solo ordine interno: trasforma il rapporto con il cliente in un servizio più chiaro,
+            curato e professionale. Il cliente percepisce che ogni passaggio è seguito, documentato e accessibile.
+          </p>
+        </div>
+        <a class="button large premium-demo" href="${demoUrl()}">Apri la demo</a>
       </div>
-      <a class="button large" href="${demoUrl()}">Apri demo</a>
     </section>
 
     <section class="faq-section" id="faq">
@@ -248,7 +251,19 @@ function renderLanding() {
         </details>
         <details>
           <summary>Il cliente può modificare i dati?</summary>
-          <p>No. L’area cliente nasce come spazio ordinato e controllato: il cliente consulta ciò che lo studio decide di condividere.</p>
+          <p>Il cliente consulta le informazioni condivise dallo studio e può rispondere alle richieste caricando i documenti necessari quando previsto.</p>
+        </details>
+        <details>
+          <summary>Il cliente riceve notifiche?</summary>
+          <p>La piattaforma prevede notifiche per aggiornamenti, documenti, richieste e attività. I canali come email e messaggi possono essere collegati al servizio scelto dallo studio.</p>
+        </details>
+        <details>
+          <summary>Posso tenere separati documenti interni e documenti visibili?</summary>
+          <p>Sì. Lo studio decide cosa rendere visibile al cliente e cosa mantenere come materiale interno di lavoro.</p>
+        </details>
+        <details>
+          <summary>A cosa serve la timeline?</summary>
+          <p>Serve a rendere leggibili passaggi, scadenze e aggiornamenti della pratica, sia per organizzare lo studio sia per dare al cliente una visione chiara del percorso.</p>
         </details>
         <details>
           <summary>Qual è il valore per lo studio?</summary>
