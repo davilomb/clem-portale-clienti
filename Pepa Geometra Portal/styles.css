@@ -11,6 +11,7 @@
   --warn: #b7791f;
   --danger: #b83232;
   --shadow: 0 16px 40px rgba(26, 38, 52, 0.12);
+  --landing-max-width: 1360px;
 }
 
 * {
@@ -56,6 +57,8 @@ button {
   align-items: center;
   border-bottom: 1px solid rgba(31, 41, 51, 0.1);
   background: rgba(251, 250, 247, 0.96);
+  width: min(100%, var(--landing-max-width));
+  margin-inline: auto;
   padding: 14px clamp(20px, 5vw, 72px);
   backdrop-filter: blur(12px);
 }
@@ -103,7 +106,9 @@ button {
   grid-template-columns: minmax(0, 1fr) minmax(420px, 0.82fr);
   gap: clamp(30px, 5vw, 74px);
   align-items: center;
+  width: min(100%, var(--landing-max-width));
   min-height: clamp(560px, calc(100vh - 220px), 720px);
+  margin-inline: auto;
   padding: clamp(34px, 4.2vw, 64px) clamp(20px, 5vw, 72px) clamp(42px, 5vw, 70px);
 }
 
@@ -248,6 +253,8 @@ button {
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
   gap: clamp(30px, 5vw, 82px);
   align-items: start;
+  width: min(100%, var(--landing-max-width));
+  margin-inline: auto;
   padding: clamp(58px, 6vw, 88px) clamp(20px, 5vw, 72px);
 }
 
@@ -304,6 +311,8 @@ button {
 .steps-section,
 .screens-section,
 .faq-section {
+  width: min(100%, var(--landing-max-width));
+  margin-inline: auto;
   padding: clamp(76px, 8vw, 122px) clamp(20px, 5vw, 72px);
 }
 
@@ -492,7 +501,9 @@ button {
   isolation: isolate;
   display: block;
   overflow: hidden;
+  width: min(100%, var(--landing-max-width));
   min-height: 560px;
+  margin-inline: auto;
   padding: clamp(70px, 8vw, 112px) clamp(20px, 5vw, 72px);
   background: #2f6f6d;
   color: #fff;
@@ -614,6 +625,8 @@ button {
   justify-content: space-between;
   gap: 14px;
   border-top: 1px solid var(--line);
+  width: min(100%, var(--landing-max-width));
+  margin-inline: auto;
   padding: 24px clamp(20px, 5vw, 72px);
   background: #fbfaf7;
 }
