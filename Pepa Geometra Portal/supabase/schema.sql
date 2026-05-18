@@ -73,7 +73,7 @@ create table if not exists public.documents (
 
 create table if not exists public.notifications (
   id text primary key,
-  project_id text not null references public.projects(id) on delete cascade,
+  project_id text references public.projects(id) on delete cascade,
   channel text not null default 'Email',
   recipient_email text not null,
   recipient_phone text default '',
@@ -85,6 +85,12 @@ create table if not exists public.notifications (
   status text not null default 'Da inviare',
   created_at text default '',
   sent_at text default ''
+);
+
+create table if not exists public.app_settings (
+  id text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at text default ''
 );
 
 create table if not exists public.timeline (
@@ -141,6 +147,28 @@ on conflict (id) do nothing;
 insert into public.users (id, username, password, name, role, email, client_id) values
   ('user-clementi', 'clementi', 'studio', 'Studio Clementi', 'Geometra', 'info@studioclementi.it', null),
   ('user-bianchi', 'bianchi', 'cliente', 'Marco Bianchi', 'Cliente', 'cliente@bianchi.it', 'cliente-bianchi')
+on conflict (id) do nothing;
+
+insert into public.app_settings (id, value, updated_at) values
+  (
+    'notifications',
+    '{
+      "emailEnabled": true,
+      "messageEnabled": false,
+      "defaultEmail": true,
+      "defaultMessage": false,
+      "emailProvider": "Brevo",
+      "messageProvider": "WhatsApp Cloud API",
+      "emailFromName": "InBolla",
+      "emailFrom": "inbolla.web@gmail.com",
+      "replyToEmail": "inbolla.web@gmail.com",
+      "whatsappSender": "InBolla",
+      "whatsappPhone": "",
+      "whatsappBusinessAccountId": "",
+      "whatsappStatus": "Futura integrazione"
+    }'::jsonb,
+    'Da configurare'
+  )
 on conflict (id) do nothing;
 
 insert into public.projects (

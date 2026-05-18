@@ -48,7 +48,7 @@ alter table public.clients
 
 create table if not exists public.notifications (
   id text primary key,
-  project_id text not null references public.projects(id) on delete cascade,
+  project_id text references public.projects(id) on delete cascade,
   channel text not null default 'Email',
   recipient_email text not null,
   recipient_phone text default '',
@@ -61,6 +61,37 @@ create table if not exists public.notifications (
   created_at text default '',
   sent_at text default ''
 );
+
+create table if not exists public.app_settings (
+  id text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at text default ''
+);
+
+insert into public.app_settings (id, value, updated_at) values
+  (
+    'notifications',
+    '{
+      "emailEnabled": true,
+      "messageEnabled": false,
+      "defaultEmail": true,
+      "defaultMessage": false,
+      "emailProvider": "Brevo",
+      "messageProvider": "WhatsApp Cloud API",
+      "emailFromName": "InBolla",
+      "emailFrom": "inbolla.web@gmail.com",
+      "replyToEmail": "inbolla.web@gmail.com",
+      "whatsappSender": "InBolla",
+      "whatsappPhone": "",
+      "whatsappBusinessAccountId": "",
+      "whatsappStatus": "Futura integrazione"
+    }'::jsonb,
+    'Da configurare'
+  )
+on conflict (id) do nothing;
+
+alter table public.notifications
+  alter column project_id drop not null;
 
 alter table public.notifications
   add column if not exists channel text not null default 'Email',

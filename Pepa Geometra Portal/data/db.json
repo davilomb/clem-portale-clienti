@@ -6,7 +6,8 @@
       "password": "studio",
       "name": "Studio Clementi",
       "role": "Geometra",
-      "email": "info@studioclementi.it"
+      "email": "info@studioclementi.it",
+      "clientId": null
     },
     {
       "id": "user-bianchi",
@@ -16,6 +17,27 @@
       "role": "Cliente",
       "email": "cliente@bianchi.it",
       "clientId": "cliente-bianchi"
+    }
+  ],
+  "appSettings": [
+    {
+      "id": "notifications",
+      "value": {
+        "emailEnabled": true,
+        "messageEnabled": false,
+        "defaultEmail": true,
+        "defaultMessage": false,
+        "emailProvider": "Brevo",
+        "messageProvider": "WhatsApp Cloud API",
+        "emailFromName": "InBolla",
+        "emailFrom": "inbolla.web@gmail.com",
+        "replyToEmail": "inbolla.web@gmail.com",
+        "whatsappSender": "InBolla",
+        "whatsappPhone": "",
+        "whatsappBusinessAccountId": "",
+        "whatsappStatus": "Futura integrazione"
+      },
+      "updatedAt": "18 mag 2026"
     }
   ],
   "clients": [

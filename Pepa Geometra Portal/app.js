@@ -22,11 +22,15 @@ const state = {
     messageEnabled: false,
     defaultEmail: true,
     defaultMessage: false,
-    emailProvider: "Da configurare",
-    messageProvider: "Da configurare",
-    senderName: "Studio Clementi",
-    senderEmail: "info@studioclementi.it",
-    messageSender: "Studio Clementi",
+    emailProvider: "Brevo",
+    messageProvider: "WhatsApp Cloud API",
+    emailFromName: "InBolla",
+    emailFrom: "inbolla.web@gmail.com",
+    replyToEmail: "inbolla.web@gmail.com",
+    whatsappSender: "InBolla",
+    whatsappPhone: "",
+    whatsappBusinessAccountId: "",
+    whatsappStatus: "Futura integrazione",
   },
   documentFilters: {
     search: "",
@@ -45,6 +49,7 @@ const state = {
     checklist: [],
     requests: [],
     notifications: [],
+    appSettings: [],
   },
 };
 
@@ -289,7 +294,7 @@ function renderLanding() {
         <div class="field"><label>Email</label><input name="email" type="email" required /></div>
         <div class="field"><label>Messaggio</label><textarea name="message" placeholder="Vorrei vedere una demo di InBolla"></textarea></div>
         <button class="button" type="submit">Invia richiesta</button>
-        <p class="contact-note">La mail di destinazione verra' collegata appena definita.</p>
+        <p class="contact-note">Le richieste vengono gestite dalla casella InBolla: inbolla.web@gmail.com.</p>
       </form>
     </section>
 
@@ -350,9 +355,16 @@ async function loadBootstrap() {
   const payload = await api("/api/bootstrap");
   state.user = payload.user;
   state.data = payload.data;
+  state.notificationSettings = notificationSettingsFromData();
   if (!state.selectedProjectId || !state.data.projects.some((item) => item.id === state.selectedProjectId)) {
     state.selectedProjectId = state.data.projects[0]?.id || null;
   }
+}
+
+function notificationSettingsFromData() {
+  const row = (state.data.appSettings || []).find((item) => item.id === "notifications");
+  const saved = row?.value && typeof row.value === "object" ? row.value : {};
+  return { ...state.notificationSettings, ...saved };
 }
 
 function accessibleProjects() {
@@ -1263,19 +1275,20 @@ function uploadRequestModal() {
 
 function notificationRows() {
   const items = state.data.notifications || [];
-  if (!items.length) return `<div class="empty-state">Nessuna notifica in coda.</div>`;
+  if (!items.length) return `<div class="empty-state">Nessuna notifica registrata.</div>`;
   return items
     .slice(0, 6)
     .map((item) => {
       const channel = item.channel || "Email";
       const recipient = channel === "WhatsApp/SMS" ? item.recipientPhone || item.recipientEmail : item.recipientEmail;
+      const statusClass = item.status === "Inviata" ? "done" : item.status?.startsWith("Errore") ? "blocked" : "waiting";
       return `
       <div class="row-item">
         <span>
           <strong>${escapeHtml(item.subject)}</strong>
           <span>${escapeHtml(recipient)} · ${escapeHtml(item.notificationType)} · ${escapeHtml(item.status)}</span>
         </span>
-        <span class="status waiting">${escapeHtml(channel)}</span>
+        <span class="status ${statusClass}">${escapeHtml(channel)}</span>
       </div>
     `;
     })
@@ -1352,11 +1365,11 @@ function notificationOptions(context = "") {
   const messageDisabled = settings.messageEnabled ? "" : "disabled";
   return `
     <fieldset class="notification-options wide">
-      <legend>Notifiche dimostrative</legend>
+      <legend>Notifiche</legend>
       <label class="toggle-row">
         <input name="notifyEmail" type="checkbox" value="true" ${emailChecked} ${emailDisabled} />
         <span>Invia mail al cliente</span>
-        <small>${settings.emailEnabled ? "Canale grafico pronto, invio reale da configurare" : "Disabilitato nei settings"}</small>
+        <small>${settings.emailEnabled ? "Invio reale se il provider email e' configurato nel backend" : "Disabilitato nei settings"}</small>
       </label>
       <label class="toggle-row">
         <input name="notifyChat" type="checkbox" value="true" ${messageChecked} ${messageDisabled} />
@@ -1548,7 +1561,7 @@ function adminOverview() {
     </div>
     <br />
     <section class="panel">
-      <div class="panel-header"><h2>Notifiche email in coda</h2></div>
+      <div class="panel-header"><h2>Notifiche inviate e predisposte</h2></div>
       <div class="panel-body client-list">${notificationRows()}</div>
     </section>
   `;
@@ -1935,52 +1948,94 @@ function adminClients() {
 
 function adminSettings() {
   const settings = state.notificationSettings;
+  const studioUsers = (state.data.users || []).filter((user) => user.role === "Geometra");
+  const senderEmails = [...new Set(studioUsers.map((user) => user.email).filter(Boolean))];
   return `
     <div class="topbar">
       <div>
         <h1>Settings</h1>
-        <p>Configurazione grafica dei canali di notifica. L'invio reale verra' collegato in una fase successiva.</p>
+        <p>Configurazione operativa dei canali, dei mittenti e degli utenti studio che gestiscono il portale.</p>
       </div>
     </div>
-    <div class="grid two">
+    <div class="settings-layout">
       <section class="panel">
-        <div class="panel-header"><h2>Canali notifiche</h2><span class="readonly-pill">Mockup</span></div>
+        <div class="panel-header">
+          <h2>Canali notifiche</h2>
+          <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">${settings.emailEnabled ? "Email abilitate" : "Email disabilitate"}</span>
+        </div>
         <form class="panel-body form-grid" data-notification-settings>
           <div class="field wide checkbox-field"><label><input name="emailEnabled" type="checkbox" value="true" ${settings.emailEnabled ? "checked" : ""} /> Abilita notifiche email</label></div>
-          <div class="field wide checkbox-field"><label><input name="messageEnabled" type="checkbox" value="true" ${settings.messageEnabled ? "checked" : ""} /> Abilita notifiche messaggio WhatsApp/SMS</label></div>
           <div class="field wide checkbox-field"><label><input name="defaultEmail" type="checkbox" value="true" ${settings.defaultEmail ? "checked" : ""} /> Seleziona email di default nei popup</label></div>
-          <div class="field wide checkbox-field"><label><input name="defaultMessage" type="checkbox" value="true" ${settings.defaultMessage ? "checked" : ""} /> Seleziona messaggio di default nei popup</label></div>
           <div class="field"><label>Provider email</label><select name="emailProvider">
-            ${["Da configurare", "Brevo", "Resend", "SendGrid"].map((item) => `<option ${settings.emailProvider === item ? "selected" : ""}>${item}</option>`).join("")}
+            ${["Brevo", "Console test", "Resend", "SendGrid", "Da configurare"].map((item) => `<option ${settings.emailProvider === item ? "selected" : ""}>${item}</option>`).join("")}
           </select></div>
-          <div class="field"><label>Provider messaggi</label><select name="messageProvider">
-            ${["Da configurare", "WhatsApp Cloud API", "Twilio", "Brevo Conversations"].map((item) => `<option ${settings.messageProvider === item ? "selected" : ""}>${item}</option>`).join("")}
+          <div class="field"><label>Nome mittente email</label><input name="emailFromName" value="${escapeHtml(settings.emailFromName)}" /></div>
+          <div class="field"><label>Email mittente</label><input name="emailFrom" list="studio-email-list" value="${escapeHtml(settings.emailFrom)}" /></div>
+          <div class="field"><label>Email risposta</label><input name="replyToEmail" list="studio-email-list" value="${escapeHtml(settings.replyToEmail)}" /></div>
+          <datalist id="studio-email-list">
+            ${senderEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("")}
+          </datalist>
+          <div class="field wide checkbox-field"><label><input name="messageEnabled" type="checkbox" value="true" ${settings.messageEnabled ? "checked" : ""} /> Predisponi messaggi WhatsApp/SMS nei popup</label></div>
+          <div class="field"><label>Provider messaggi futuro</label><select name="messageProvider">
+            ${["WhatsApp Cloud API", "Twilio", "Brevo Conversations", "Da configurare"].map((item) => `<option ${settings.messageProvider === item ? "selected" : ""}>${item}</option>`).join("")}
           </select></div>
-          <div class="field"><label>Mittente email</label><input name="senderName" value="${escapeHtml(settings.senderName)}" /></div>
-          <div class="field"><label>Email mittente</label><input name="senderEmail" value="${escapeHtml(settings.senderEmail)}" /></div>
-          <div class="field wide"><label>Nome mittente messaggi</label><input name="messageSender" value="${escapeHtml(settings.messageSender)}" /></div>
-          <button class="button wide" type="submit">Salva impostazioni mockup</button>
+          <div class="field"><label>Nome mittente messaggi</label><input name="whatsappSender" value="${escapeHtml(settings.whatsappSender)}" /></div>
+          <div class="field"><label>Numero WhatsApp Business</label><input name="whatsappPhone" value="${escapeHtml(settings.whatsappPhone)}" placeholder="+39 ..." /></div>
+          <div class="field"><label>Business account ID</label><input name="whatsappBusinessAccountId" value="${escapeHtml(settings.whatsappBusinessAccountId)}" placeholder="Da collegare in futuro" /></div>
+          <div class="field wide checkbox-field"><label><input name="defaultMessage" type="checkbox" value="true" ${settings.defaultMessage ? "checked" : ""} /> Seleziona messaggio di default nei popup quando sara' attivo</label></div>
+          <button class="button wide" type="submit">Salva impostazioni</button>
         </form>
       </section>
+
       <section class="panel">
-        <div class="panel-header"><h2>Template notifiche</h2><span class="readonly-pill">Solo grafica</span></div>
+        <div class="panel-header"><h2>Utenti studio</h2><span class="readonly-pill">Lato Geometra</span></div>
+        <div class="panel-body settings-users">
+          ${studioUsers.map((user) => `
+            <form class="settings-user-card" data-user-update="${escapeHtml(user.id)}">
+              <div class="settings-user-title">
+                <strong>${escapeHtml(user.name)}</strong>
+                ${user.email === settings.emailFrom ? `<span class="visibility-pill visible">Mittente comunicazioni</span>` : `<span class="visibility-pill hidden">Utente studio</span>`}
+              </div>
+              <div class="form-grid compact-form">
+                <div class="field"><label>Nome</label><input name="name" value="${escapeHtml(user.name)}" required /></div>
+                <div class="field"><label>Email</label><input name="email" type="email" value="${escapeHtml(user.email)}" required /></div>
+                <div class="field"><label>Username</label><input name="username" value="${escapeHtml(user.username)}" required /></div>
+                <div class="field"><label>Nuova password</label><input name="password" type="text" placeholder="Lascia vuoto per non cambiare" /></div>
+                <button class="button secondary" type="submit">Salva utente</button>
+              </div>
+            </form>
+          `).join("")}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2>Nuovo utente Geometra</h2><span class="edit-pill">Accesso studio</span></div>
+        <form class="panel-body form-grid" data-user-create>
+          <div class="field"><label>Nome</label><input name="name" required /></div>
+          <div class="field"><label>Email comunicazioni</label><input name="email" type="email" required /></div>
+          <div class="field"><label>Username</label><input name="username" required /></div>
+          <div class="field"><label>Password temporanea</label><input name="password" required /></div>
+          <button class="button wide" type="submit">Crea utente studio</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2>Template e stato integrazioni</h2><span class="readonly-pill">Architettura pronta</span></div>
         <div class="panel-body settings-preview">
           <article>
-            <strong>Nuovo documento pubblicato</strong>
-            <p>Avvisa il cliente quando un documento visibile viene caricato o aggiornato.</p>
-            <span class="visibility-pill visible">Email</span>
-            <span class="visibility-pill hidden">Messaggio</span>
+            <strong>Creazione accesso cliente</strong>
+            <p>Email automatica con username, password temporanea e link al portale.</p>
+            <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">Email</span>
           </article>
           <article>
-            <strong>Nuova richiesta al cliente</strong>
-            <p>Avvisa il cliente quando lo studio pubblica una richiesta o richiede un caricamento.</p>
-            <span class="visibility-pill visible">Email</span>
-            <span class="visibility-pill hidden">Messaggio</span>
+            <strong>Documenti aggiornati</strong>
+            <p>Notifica al cliente con progetto, cartella, versione, stato e commento del documento.</p>
+            <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">Email</span>
           </article>
           <article>
-            <strong>Timeline e task</strong>
-            <p>Predisposizione per notificare aggiornamenti, scadenze e task visibili al cliente.</p>
-            <span class="status waiting">Da collegare</span>
+            <strong>Documento caricato dal cliente</strong>
+            <p>Avviso allo studio quando il cliente risponde a una richiesta con caricamento file.</p>
+            <span class="${settings.messageEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">WhatsApp futuro</span>
           </article>
         </div>
       </section>
@@ -2215,22 +2270,56 @@ function bindWorkspaceActions() {
     });
   });
 
-  document.querySelector("[data-notification-settings]")?.addEventListener("submit", (event) => {
+  document.querySelector("[data-notification-settings]")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const values = formValues(form);
-    state.notificationSettings = {
-      emailEnabled: Boolean(values.emailEnabled),
-      messageEnabled: Boolean(values.messageEnabled),
-      defaultEmail: Boolean(values.defaultEmail),
-      defaultMessage: Boolean(values.defaultMessage),
-      emailProvider: values.emailProvider || "Da configurare",
-      messageProvider: values.messageProvider || "Da configurare",
-      senderName: values.senderName || "Studio Clementi",
-      senderEmail: values.senderEmail || "",
-      messageSender: values.messageSender || "Studio Clementi",
-    };
-    renderWorkspace();
+    try {
+      await api("/api/settings/notifications", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...values,
+          emailEnabled: Boolean(values.emailEnabled),
+          messageEnabled: Boolean(values.messageEnabled),
+          defaultEmail: Boolean(values.defaultEmail),
+          defaultMessage: Boolean(values.defaultMessage),
+        }),
+      });
+      await loadBootstrap();
+      renderWorkspace();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+
+  document.querySelector("[data-user-create]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await api("/api/users", {
+        method: "POST",
+        body: JSON.stringify(formValues(event.currentTarget)),
+      });
+      await loadBootstrap();
+      renderWorkspace();
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+
+  document.querySelectorAll("[data-user-update]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        await api(`/api/users/${encodeURIComponent(form.dataset.userUpdate)}`, {
+          method: "PATCH",
+          body: JSON.stringify(formValues(form)),
+        });
+        await loadBootstrap();
+        renderWorkspace();
+      } catch (error) {
+        alert(error.message);
+      }
+    });
   });
 
   const filterForm = document.querySelector("[data-document-filters]");

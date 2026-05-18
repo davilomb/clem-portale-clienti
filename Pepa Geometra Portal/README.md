@@ -113,9 +113,51 @@ Quando Supabase e' attivo:
 - nel database viene salvata solo la scheda documento;
 - il cliente puo' aprire solo documenti visibili al cliente e relativi ai propri progetti.
 - ogni documento puo' avere categoria, tag, stato e versioni;
-- quando viene pubblicato un documento visibile al cliente il geometra puo' scegliere se accodare notifica via mail e/o via chat WhatsApp/SMS.
+- quando viene pubblicato un documento visibile al cliente il geometra puo' scegliere se inviare una notifica via mail e/o predisporre una notifica via chat WhatsApp/SMS.
 
 In locale, senza Supabase, il portale continua a salvare solo i metadati documento in `db.json`.
+
+## Notifiche email reali
+
+Il canale email e' collegato al backend in versione semplice. Il server crea sempre un record nella tabella/lista `notifications`, poi prova l'invio tramite provider configurato.
+
+Eventi coperti:
+
+- creazione cliente/accesso CRM: email al cliente con link portale, username e password temporanea;
+- nuovo documento o nuova versione visibile al cliente: email al cliente con progetto, cartella, versione, stato e commento;
+- documento caricato dal cliente su richiesta: email allo studio/geometra.
+
+Il file non viene mai allegato alla mail: la mail porta sempre al portale.
+
+Stati possibili della notifica:
+
+- `Da inviare`;
+- `Inviata`;
+- `Errore: ...`;
+- `Solo grafica` per canali WhatsApp/SMS non ancora attivi.
+
+Configura le variabili ambiente:
+
+```txt
+APP_PUBLIC_URL=https://indirizzo-pubblico-del-portale
+EMAIL_PROVIDER=brevo
+EMAIL_FROM=inbolla.web@gmail.com
+EMAIL_FROM_NAME=InBolla
+BREVO_API_KEY=...
+```
+
+Provider supportati: `brevo`, `resend`, `sendgrid`. Per test locale senza invio reale puoi usare `EMAIL_PROVIDER=console`, che stampa il contenuto email nel terminale.
+
+Le chiavi restano sempre su Render/Supabase e non vengono salvate nel portale. Dal menu `Settings` del portale Geometra puoi invece gestire:
+
+- email abilitate/disabilitate;
+- mittente email e reply-to usati dal backend;
+- utenti studio autorizzati lato Geometra;
+- predisposizione futura WhatsApp/SMS.
+
+Nota importante per Brevo: l'email mittente scelta nei Settings deve essere un mittente verificato in Brevo, altrimenti l'invio reale andra' in errore e verra' tracciato nella tabella `notifications`.
+
+Il canale WhatsApp/SMS resta per ora solo grafico/predisposto: la spunta crea una notifica con stato `Solo grafica`, senza chiamare provider esterni.
 
 ## Upgrade gestione documentale
 
@@ -132,22 +174,21 @@ Questo aggiunge:
 - stato documento;
 - relazione tra versioni;
 - numero versione;
-- tabella `notifications` per preparare notifiche multicanale: email e WhatsApp/SMS.
+- tabella `notifications` per tracciare notifiche multicanale: email inviate dal backend e WhatsApp/SMS predisposte;
+- tabella `app_settings` per salvare i Settings operativi di notifiche, mittenti e predisposizione WhatsApp;
+- supporto a notifiche non collegate direttamente a un progetto, come la mail di creazione accesso cliente.
 
-Le notifiche sono per ora accodate nel database. L'invio reale richiedera':
-
-- un provider email come Brevo, Resend o SendGrid;
-- un provider WhatsApp Business/SMS come Twilio, MessageBird, Brevo Conversations o Meta WhatsApp Cloud API;
-- un job server-side che legga le notifiche `Da inviare`, chiami il provider corretto e aggiorni lo stato a `Inviata` o `Errore`.
+Per l'invio email reale serve configurare un provider supportato. Per WhatsApp/SMS servira' in una fase successiva un provider come Twilio, MessageBird, Brevo Conversations o Meta WhatsApp Cloud API.
 
 ## Prossimi passaggi tecnici
 
 1. Aggiungere password cifrate.
-2. Aggiungere invito email cliente.
-3. Aggiungere versionamento documenti.
-4. Aggiungere log accessi e download.
-5. Collegare l'invio reale delle notifiche email e WhatsApp/SMS.
-6. Preparare backup e procedure GDPR.
+2. Aggiungere cambio password/reset password.
+3. Aggiungere preview strutturata dei template email prima dell'invio reale.
+4. Aggiungere versionamento documenti.
+5. Aggiungere log accessi e download.
+6. Collegare l'invio reale delle notifiche WhatsApp/SMS.
+7. Preparare backup e procedure GDPR.
 
 ## Stack consigliato per la fase successiva
 

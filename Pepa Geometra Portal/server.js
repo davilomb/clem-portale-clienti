@@ -13,6 +13,26 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const storageBucket = process.env.SUPABASE_STORAGE_BUCKET || "project-documents";
 const useSupabase = Boolean(supabaseUrl && supabaseKey);
 const demoOnly = process.env.DEMO_ONLY === "true";
+const appPublicUrl = (process.env.APP_PUBLIC_URL || "").replace(/\/$/, "");
+const emailProvider = (process.env.EMAIL_PROVIDER || "").toLowerCase();
+const emailFrom = process.env.EMAIL_FROM || "inbolla.web@gmail.com";
+const emailFromName = process.env.EMAIL_FROM_NAME || "InBolla";
+
+const defaultNotificationSettings = {
+  emailEnabled: true,
+  messageEnabled: false,
+  defaultEmail: true,
+  defaultMessage: false,
+  emailProvider: "Brevo",
+  messageProvider: "WhatsApp Cloud API",
+  emailFromName,
+  emailFrom,
+  replyToEmail: emailFrom,
+  whatsappSender: "InBolla",
+  whatsappPhone: "",
+  whatsappBusinessAccountId: "",
+  whatsappStatus: "Futura integrazione",
+};
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -69,6 +89,10 @@ function publicUser(user) {
   return safe;
 }
 
+function publicUsers(users) {
+  return (users || []).map(publicUser);
+}
+
 function currentUser(req) {
   const sid = parseCookies(req).sid;
   if (!sid) return null;
@@ -77,6 +101,48 @@ function currentUser(req) {
 
 function isAdmin(user) {
   return user?.role === "Geometra";
+}
+
+function boolValue(value, fallback = false) {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  return value === "true" || value === "on" || value === "1";
+}
+
+function notificationSettings(db) {
+  const row = (db.appSettings || []).find((item) => item.id === "notifications");
+  const value = row?.value && typeof row.value === "object" ? row.value : {};
+  return { ...defaultNotificationSettings, ...value };
+}
+
+function normalizeNotificationSettings(payload = {}, current = defaultNotificationSettings) {
+  return {
+    emailEnabled: boolValue(payload.emailEnabled, current.emailEnabled),
+    messageEnabled: boolValue(payload.messageEnabled, current.messageEnabled),
+    defaultEmail: boolValue(payload.defaultEmail, current.defaultEmail),
+    defaultMessage: boolValue(payload.defaultMessage, current.defaultMessage),
+    emailProvider: payload.emailProvider || current.emailProvider || "Brevo",
+    messageProvider: payload.messageProvider || current.messageProvider || "WhatsApp Cloud API",
+    emailFromName: payload.emailFromName || payload.senderName || current.emailFromName || emailFromName,
+    emailFrom: payload.emailFrom || payload.senderEmail || current.emailFrom || emailFrom,
+    replyToEmail: payload.replyToEmail || current.replyToEmail || emailFrom,
+    whatsappSender: payload.whatsappSender || payload.messageSender || current.whatsappSender || "InBolla",
+    whatsappPhone: payload.whatsappPhone || current.whatsappPhone || "",
+    whatsappBusinessAccountId: payload.whatsappBusinessAccountId || current.whatsappBusinessAccountId || "",
+    whatsappStatus: payload.whatsappStatus || current.whatsappStatus || "Futura integrazione",
+  };
+}
+
+async function saveNotificationSettings(store, db, payload) {
+  const current = notificationSettings(db);
+  const value = normalizeNotificationSettings(payload, current);
+  const row = {
+    id: "notifications",
+    value,
+    updatedAt: todayLabel(),
+  };
+  const exists = (db.appSettings || []).some((item) => item.id === row.id);
+  return exists ? store.update("appSettings", row.id, row) : store.insert("appSettings", row);
 }
 
 function bodyJson(req) {
@@ -196,7 +262,7 @@ function todayLabel() {
 }
 
 function clientVisibleDb(db, user) {
-  if (isAdmin(user)) return db;
+  if (isAdmin(user)) return { ...db, users: publicUsers(db.users) };
 
   const projects = db.projects.filter((project) => project.clientId === user.clientId);
   const ids = new Set(projects.map((project) => project.id));
@@ -230,26 +296,312 @@ function clientForProject(db, projectId) {
   return db.clients.find((client) => client.id === project.clientId) || null;
 }
 
-async function queueNotification(store, db, payload) {
+function studioRecipient(db) {
+  const admin = db.users.find((user) => isAdmin(user) && user.email);
+  return admin ? { email: admin.email, phone: admin.phone || "", name: admin.name } : null;
+}
+
+function notificationRecipient(db, payload) {
+  if (payload.recipientEmail || payload.recipientPhone) {
+    return {
+      email: payload.recipientEmail || "",
+      phone: payload.recipientPhone || "",
+      name: payload.recipientName || "",
+    };
+  }
+  if (payload.recipientType === "Studio") return studioRecipient(db);
   const client = clientForProject(db, payload.projectId);
+  return client ? { email: client.email, phone: client.phone || "", name: client.name } : null;
+}
+
+function emailProviderKey(label = "") {
+  if (emailProvider === "console") return "console";
+  const normalized = String(label || "").toLowerCase();
+  if (normalized.includes("brevo")) return "brevo";
+  if (normalized.includes("resend")) return "resend";
+  if (normalized.includes("sendgrid")) return "sendgrid";
+  if (normalized.includes("console")) return "console";
+  return emailProvider;
+}
+
+function emailConfigured(provider = emailProviderKey()) {
+  if (provider === "brevo") return Boolean(process.env.BREVO_API_KEY);
+  if (provider === "resend") return Boolean(process.env.RESEND_API_KEY);
+  if (provider === "sendgrid") return Boolean(process.env.SENDGRID_API_KEY);
+  if (provider === "console") return true;
+  return false;
+}
+
+function portalLink(projectId) {
+  if (!appPublicUrl) return "";
+  const basePath = demoOnly ? "/demo" : "";
+  if (!projectId) return `${appPublicUrl}${basePath}`;
+  return `${appPublicUrl}${basePath}?project=${encodeURIComponent(projectId)}`;
+}
+
+function escapeEmail(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[char]);
+}
+
+function emailLayout({ eyebrow = "Portale clienti", title, intro, details = [], ctaLabel = "Apri il portale", link = "" }) {
+  const rows = details
+    .filter((item) => item?.value !== undefined && item?.value !== null && String(item.value).trim() !== "")
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding:9px 0;color:#64748b;border-bottom:1px solid #e5edf0;width:38%">${escapeEmail(item.label)}</td>
+          <td style="padding:9px 0;color:#111827;border-bottom:1px solid #e5edf0;font-weight:600">${escapeEmail(item.value)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+  const detailTable = rows
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:18px 0;border-collapse:collapse">${rows}</table>`
+    : "";
+  const cta = link
+    ? `<p style="margin:24px 0 10px"><a href="${escapeEmail(link)}" style="display:inline-block;padding:12px 16px;border-radius:7px;background:#1f6f68;color:#ffffff;text-decoration:none;font-weight:700">${escapeEmail(ctaLabel)}</a></p>`
+    : "";
+  return `
+    <div style="margin:0;padding:0;background:#f4f7f8">
+      <div style="max-width:640px;margin:0 auto;padding:28px 18px;font-family:Arial,sans-serif;color:#1f2937;line-height:1.5">
+        <div style="background:#ffffff;border:1px solid #dde8ea;border-radius:10px;padding:26px">
+          <p style="margin:0 0 8px;color:#1f6f68;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em">${escapeEmail(eyebrow)}</p>
+          <h1 style="margin:0 0 14px;font-size:24px;line-height:1.25;color:#111827">${escapeEmail(title)}</h1>
+          <p style="margin:0;color:#334155">${escapeEmail(intro)}</p>
+          ${detailTable}
+          ${cta}
+          <p style="margin:22px 0 0;color:#64748b;font-size:13px">Messaggio automatico dal portale clienti InBolla.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function emailText({ title, intro, details = [], ctaLabel = "Apri il portale", link = "" }) {
+  const detailLines = details
+    .filter((item) => item?.value !== undefined && item?.value !== null && String(item.value).trim() !== "")
+    .map((item) => `${item.label}: ${item.value}`)
+    .join("\n");
+  return [title, "", intro, detailLines ? `\n${detailLines}` : "", link ? `\n${ctaLabel}: ${link}` : "", "\nMessaggio automatico dal portale clienti InBolla."]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function fallbackEmailContent(notification) {
+  const link = portalLink(notification.projectId);
+  return {
+    textContent: link ? `${notification.message}\n\nApri il portale: ${link}` : notification.message,
+    htmlContent: emailLayout({
+      title: notification.subject,
+      intro: notification.message,
+      link,
+    }),
+  };
+}
+
+function accessEmailTemplate({ clientName, username, password }) {
+  const link = portalLink("");
+  const payload = {
+    eyebrow: "Nuovo accesso cliente",
+    title: "Il tuo accesso al portale InBolla e' pronto",
+    intro: `Ciao ${clientName}, Studio Clementi ha creato il tuo accesso personale al portale clienti. Da qui potrai consultare progetti, documenti, richieste e aggiornamenti pubblicati dallo studio.`,
+    details: [
+      { label: "Cliente", value: clientName },
+      { label: "Username", value: username },
+      { label: "Password temporanea", value: password },
+      { label: "Nota sicurezza", value: "Conserva queste credenziali e non inoltrarle a terzi." },
+    ],
+    ctaLabel: "Accedi al portale",
+    link,
+  };
+  return {
+    subject: "Il tuo accesso al portale InBolla",
+    message: `Accesso cliente creato per ${clientName}. Username: ${username}.`,
+    htmlContent: emailLayout(payload),
+    textContent: emailText(payload),
+  };
+}
+
+function documentEmailTemplate({ db, documentRecord, existingDocument }) {
+  const project = db.projects.find((item) => item.id === documentRecord.projectId);
+  const folder = (db.documentFolders || []).find((item) => item.id === documentRecord.folderId);
+  const link = portalLink(documentRecord.projectId);
+  const payload = {
+    eyebrow: existingDocument ? "Nuova versione documento" : "Nuovo documento",
+    title: existingDocument ? "Nuova versione documento disponibile" : "Nuovo documento disponibile",
+    intro: `Studio Clementi ha ${existingDocument ? "pubblicato una nuova versione di un documento" : "pubblicato un nuovo documento"} nel portale clienti.`,
+    details: [
+      { label: "Progetto", value: project?.title || documentRecord.projectId },
+      { label: "Cliente", value: project?.client || "" },
+      { label: "Cartella", value: folder?.name || documentRecord.category || "Documenti del progetto" },
+      { label: "Documento", value: documentRecord.title },
+      { label: "Versione", value: documentRecord.version },
+      { label: "Stato", value: documentRecord.documentStatus },
+      { label: "Commento", value: documentRecord.comment || "Nessun commento aggiuntivo" },
+      { label: "Data", value: documentRecord.date },
+    ],
+    ctaLabel: "Apri il documento nel portale",
+    link,
+  };
+  return {
+    subject: existingDocument ? "Nuova versione documento disponibile" : "Nuovo documento disponibile",
+    message: `${documentRecord.title} (${documentRecord.version}) e' disponibile nel portale clienti per il progetto ${project?.title || documentRecord.projectId}.`,
+    htmlContent: emailLayout(payload),
+    textContent: emailText(payload),
+  };
+}
+
+function clientUploadEmailTemplate({ user, project, request, documentRecord, comment }) {
+  const link = portalLink(project.id);
+  const payload = {
+    eyebrow: "Documento caricato dal cliente",
+    title: "Un cliente ha caricato un documento",
+    intro: `${user.name} ha caricato un documento richiesto nel portale clienti.`,
+    details: [
+      { label: "Cliente", value: user.name },
+      { label: "Progetto", value: project.title },
+      { label: "Richiesta", value: request.title },
+      { label: "Documento", value: documentRecord.title },
+      { label: "File", value: documentRecord.fileName },
+      { label: "Commento cliente", value: comment || "Nessun commento aggiuntivo" },
+      { label: "Data", value: documentRecord.date },
+    ],
+    ctaLabel: "Apri il progetto",
+    link,
+  };
+  return {
+    subject: "Documento caricato dal cliente",
+    message: `${user.name} ha caricato ${documentRecord.title} per il progetto ${project.title}.`,
+    htmlContent: emailLayout(payload),
+    textContent: emailText(payload),
+  };
+}
+
+async function sendEmailNotification(notification, settings = defaultNotificationSettings) {
+  const provider = emailProviderKey(settings.emailProvider);
+  if (!emailConfigured(provider)) {
+    throw new Error("Provider email non configurato");
+  }
+
+  const fallback = fallbackEmailContent(notification);
+  const text = notification.textContent || fallback.textContent;
+  const html = notification.htmlContent || fallback.htmlContent;
+  const senderEmail = settings.emailFrom || emailFrom;
+  const senderName = settings.emailFromName || emailFromName;
+  const replyToEmail = settings.replyToEmail || senderEmail;
+
+  if (provider === "console") {
+    console.log(`[email:console] ${notification.recipientEmail} | ${notification.subject}\n${text}`);
+    return;
+  }
+
+  let response;
+  if (provider === "brevo") {
+    response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": process.env.BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { email: senderEmail, name: senderName },
+        to: [{ email: notification.recipientEmail, name: notification.recipientName || undefined }],
+        replyTo: replyToEmail ? { email: replyToEmail, name: senderName } : undefined,
+        subject: notification.subject,
+        htmlContent: html,
+        textContent: text,
+      }),
+    });
+  } else if (provider === "resend") {
+    response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: `${senderName} <${senderEmail}>`,
+        to: [notification.recipientEmail],
+        reply_to: replyToEmail,
+        subject: notification.subject,
+        html,
+        text,
+      }),
+    });
+  } else if (provider === "sendgrid") {
+    response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: notification.recipientEmail, name: notification.recipientName || undefined }] }],
+        from: { email: senderEmail, name: senderName },
+        reply_to: replyToEmail ? { email: replyToEmail, name: senderName } : undefined,
+        subject: notification.subject,
+        content: [
+          { type: "text/plain", value: text },
+          { type: "text/html", value: html },
+        ],
+      }),
+    });
+  } else {
+    throw new Error("EMAIL_PROVIDER non supportato");
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Invio email non riuscito");
+  }
+}
+
+async function queueNotification(store, db, payload) {
+  const settings = notificationSettings(db);
+  const recipient = notificationRecipient(db, payload);
   const channel = payload.channel || "Email";
-  if (channel === "Email" && !client?.email) return null;
-  if (channel === "WhatsApp/SMS" && !client?.phone) return null;
-  return store.insert("notifications", {
+  if (channel === "Email" && !recipient?.email) return null;
+  if (channel === "WhatsApp/SMS" && !recipient?.phone) return null;
+  const notification = await store.insert("notifications", {
     id: `note-${Date.now()}-${Math.round(Math.random() * 1000)}`,
-    projectId: payload.projectId,
+    projectId: payload.projectId || null,
     channel,
-    recipientEmail: client.email,
-    recipientPhone: client.phone || "",
+    recipientEmail: recipient.email,
+    recipientPhone: recipient.phone || "",
     notificationType: payload.notificationType,
     relatedType: payload.relatedType,
     relatedId: payload.relatedId,
     subject: payload.subject,
     message: payload.message,
-    status: "Da inviare",
+    status: channel === "Email" ? (settings.emailEnabled ? "Da inviare" : "Email disabilitata") : "Solo grafica",
     createdAt: todayLabel(),
     sentAt: "",
   });
+
+  if (channel !== "Email" || !settings.emailEnabled) return notification;
+
+  try {
+    await sendEmailNotification({
+      ...notification,
+      recipientName: recipient.name || "",
+      htmlContent: payload.htmlContent,
+      textContent: payload.textContent,
+    }, settings);
+    return store.update("notifications", notification.id, {
+      status: "Inviata",
+      sentAt: todayLabel(),
+    });
+  } catch (error) {
+    return store.update("notifications", notification.id, {
+      status: `Errore: ${String(error.message || error).slice(0, 160)}`,
+    });
+  }
 }
 
 function toSnake(value) {
@@ -339,7 +691,16 @@ function fromSnake(row) {
     subject: row.subject,
     message: row.message,
     sentAt: row.sent_at,
+    value: row.value,
   };
+}
+
+function tableName(table) {
+  const names = {
+    appSettings: "app_settings",
+    documentFolders: "document_folders",
+  };
+  return names[table] || table;
 }
 
 async function supabaseFetch(pathname, options = {}) {
@@ -375,7 +736,7 @@ async function optionalTableGet(table, query = "select=*") {
 }
 
 async function tableInsert(table, row) {
-  const rows = await supabaseFetch(`/rest/v1/${table === "documentFolders" ? "document_folders" : table}`, {
+  const rows = await supabaseFetch(`/rest/v1/${tableName(table)}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -387,7 +748,7 @@ async function tableInsert(table, row) {
 }
 
 async function tableUpdate(table, id, row) {
-  const rows = await supabaseFetch(`/rest/v1/${table === "documentFolders" ? "document_folders" : table}?id=eq.${encodeURIComponent(id)}`, {
+  const rows = await supabaseFetch(`/rest/v1/${tableName(table)}?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -439,7 +800,7 @@ async function storageSignedUrl(storageKey) {
 
 async function readDb() {
   if (!useSupabase) return readJsonDb();
-  const [users, clients, projects, documents, documentFolders, timeline, events, checklist, requests, notifications] =
+  const [users, clients, projects, documents, documentFolders, timeline, events, checklist, requests, notifications, appSettings] =
     await Promise.all([
       tableGet("users", "select=*"),
       tableGet("clients", "select=*"),
@@ -451,8 +812,9 @@ async function readDb() {
       tableGet("checklist", "select=*"),
       tableGet("requests", "select=*"),
       optionalTableGet("notifications", "select=*&order=created_at.desc"),
+      optionalTableGet("app_settings", "select=*"),
     ]);
-  return { users, clients, projects, documents, documentFolders, timeline, events, checklist, requests, notifications };
+  return { users, clients, projects, documents, documentFolders, timeline, events, checklist, requests, notifications, appSettings };
 }
 
 function createLocalStore(db) {
@@ -495,7 +857,7 @@ function createStore(db) {
     insert: tableInsert,
     update: tableUpdate,
     async delete(table, id) {
-      await supabaseFetch(`/rest/v1/${table === "documentFolders" ? "document_folders" : table}?id=eq.${encodeURIComponent(id)}`, {
+      await supabaseFetch(`/rest/v1/${tableName(table)}?id=eq.${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: { Prefer: "return=minimal" },
       });
@@ -632,7 +994,7 @@ async function handleApi(req, res) {
     const storageKey = file ? `client-uploads/${fields.projectId}/${documentId}/${safeFilename}` : "";
     if (file) await store.upload(storageKey, file);
 
-    await store.insert("documents", {
+    const documentRecord = {
       id: documentId,
       projectId: fields.projectId,
       folderId: "",
@@ -653,20 +1015,33 @@ async function handleApi(req, res) {
       fileName: file.filename,
       mimeType: file.contentType,
       fileSize: file.buffer.length,
-    });
+    };
+
+    await store.insert("documents", documentRecord);
 
     await store.update("requests", request.id, {
       status: "Caricato dal cliente",
       uploadedDocumentId: documentId,
     });
 
+    const emailContent = clientUploadEmailTemplate({
+      user,
+      project,
+      request,
+      documentRecord,
+      comment: fields.comment || "",
+    });
+
     await queueNotification(store, db, {
       projectId: fields.projectId,
+      recipientType: "Studio",
       notificationType: "Documento caricato dal cliente",
       relatedType: "document",
       relatedId: documentId,
-      subject: "Documento caricato dal cliente",
-      message: `${user.name} ha caricato un documento per la richiesta: ${request.title}.`,
+      subject: emailContent.subject,
+      message: emailContent.message,
+      htmlContent: emailContent.htmlContent,
+      textContent: emailContent.textContent,
     });
 
     sendJson(res, 201, { ok: true });
@@ -675,6 +1050,72 @@ async function handleApi(req, res) {
 
   if (!isAdmin(user)) {
     sendJson(res, 403, { error: "Il cliente ha accesso in sola lettura" });
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname === "/api/settings/notifications") {
+    const payload = await bodyJson(req);
+    const row = await saveNotificationSettings(store, db, payload);
+    sendJson(res, 200, { ok: true, settings: row.value });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/users") {
+    const payload = await bodyJson(req);
+    const username = String(payload.username || "").trim();
+    const email = String(payload.email || "").trim();
+    const name = String(payload.name || "").trim();
+    if (!name || !username || !email || !payload.password) {
+      sendJson(res, 400, { error: "Nome, email, username e password sono obbligatori" });
+      return;
+    }
+    if (db.users.some((item) => item.username === username)) {
+      sendJson(res, 409, { error: "Username gia' presente" });
+      return;
+    }
+    const idBase = `user-${slug(username)}`;
+    const id = db.users.some((item) => item.id === idBase) ? `${idBase}-${Date.now()}` : idBase;
+    const created = await store.insert("users", {
+      id,
+      username,
+      password: payload.password,
+      name,
+      role: payload.role === "Cliente" ? "Cliente" : "Geometra",
+      email,
+      clientId: payload.clientId || null,
+    });
+    sendJson(res, 201, { ok: true, user: publicUser(created) });
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/users/")) {
+    const userId = decodeURIComponent(url.pathname.replace("/api/users/", ""));
+    const target = db.users.find((item) => item.id === userId);
+    if (!target) {
+      sendJson(res, 404, { error: "Utente non trovato" });
+      return;
+    }
+    const payload = await bodyJson(req);
+    const username = String(payload.username || target.username).trim();
+    const email = String(payload.email || target.email).trim();
+    const name = String(payload.name || target.name).trim();
+    if (!name || !username || !email) {
+      sendJson(res, 400, { error: "Nome, email e username sono obbligatori" });
+      return;
+    }
+    if (db.users.some((item) => item.id !== userId && item.username === username)) {
+      sendJson(res, 409, { error: "Username gia' presente" });
+      return;
+    }
+    const updated = await store.update("users", userId, {
+      username,
+      email,
+      name,
+      role: target.role,
+      password: payload.password ? payload.password : target.password,
+      clientId: target.clientId || null,
+    });
+    sendJson(res, 200, { ok: true, user: publicUser(updated) });
     return;
   }
 
@@ -780,13 +1221,16 @@ async function handleApi(req, res) {
     const shouldNotifyByEmail = fields.notifyEmail === "true";
     const shouldNotifyByChat = fields.notifyChat === "true";
     if (visibility === "Cliente" && (shouldNotifyByEmail || shouldNotifyByChat)) {
+      const emailContent = documentEmailTemplate({ db, documentRecord, existingDocument });
       const notificationBase = {
         projectId: fields.projectId,
         notificationType: existingDocument ? "Nuova versione documento" : "Nuovo documento",
         relatedType: "document",
         relatedId: documentId,
-        subject: existingDocument ? "Nuova versione documento disponibile" : "Nuovo documento disponibile",
-        message: `${documentRecord.title} e' disponibile nel portale clienti.`,
+        subject: emailContent.subject,
+        message: emailContent.message,
+        htmlContent: emailContent.htmlContent,
+        textContent: emailContent.textContent,
       };
       if (shouldNotifyByEmail) await queueNotification(store, db, { ...notificationBase, channel: "Email" });
       if (shouldNotifyByChat) await queueNotification(store, db, { ...notificationBase, channel: "WhatsApp/SMS" });
@@ -996,6 +1440,24 @@ async function handleApi(req, res) {
       role: "Cliente",
       email: payload.email,
       clientId: id,
+    });
+    const emailContent = accessEmailTemplate({
+      clientName: payload.name,
+      username: payload.username,
+      password: payload.password,
+    });
+    await queueNotification(store, db, {
+      projectId: null,
+      recipientEmail: payload.email,
+      recipientName: payload.name,
+      notificationType: "Accesso cliente creato",
+      relatedType: "client",
+      relatedId: id,
+      subject: emailContent.subject,
+      message: emailContent.message,
+      htmlContent: emailContent.htmlContent,
+      textContent: emailContent.textContent,
+      channel: "Email",
     });
     sendJson(res, 201, { ok: true, id });
     return;
