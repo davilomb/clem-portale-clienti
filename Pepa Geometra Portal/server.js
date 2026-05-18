@@ -1060,6 +1060,44 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/settings/test-email") {
+    const payload = await bodyJson(req);
+    const recipientEmail = String(payload.email || user.email || "").trim();
+    if (!recipientEmail) {
+      sendJson(res, 400, { error: "Inserisci una email destinatario per il test" });
+      return;
+    }
+    const link = portalLink(null);
+    const emailPayload = {
+      eyebrow: "Test notifiche",
+      title: "Email di test InBolla",
+      intro: "Questa email conferma che il canale notifiche del portale e' collegato correttamente.",
+      details: [
+        { label: "Destinatario", value: recipientEmail },
+        { label: "Mittente configurato", value: notificationSettings(db).emailFrom },
+        { label: "Provider", value: notificationSettings(db).emailProvider },
+        { label: "Data test", value: todayLabel() },
+      ],
+      ctaLabel: "Apri il portale",
+      link,
+    };
+    const notification = await queueNotification(store, db, {
+      projectId: null,
+      recipientEmail,
+      recipientName: payload.name || user.name,
+      notificationType: "Test email",
+      relatedType: "settings",
+      relatedId: "notifications",
+      subject: "Test notifiche InBolla",
+      message: `Email test inviata a ${recipientEmail}.`,
+      htmlContent: emailLayout(emailPayload),
+      textContent: emailText(emailPayload),
+      channel: "Email",
+    });
+    sendJson(res, 200, { ok: true, notification });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/users") {
     const payload = await bodyJson(req);
     const username = String(payload.username || "").trim();

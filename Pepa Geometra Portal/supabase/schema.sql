@@ -53,14 +53,16 @@ create table if not exists public.projects (
 create table if not exists public.documents (
   id text primary key,
   project_id text not null references public.projects(id) on delete cascade,
+  folder_id text default '',
   title text not null,
   type text default 'PDF',
   version text default 'v1.0',
   date text default '',
-  visibility text not null default 'Cliente' check (visibility in ('Cliente', 'Interno')),
+  visibility text not null default 'Cliente' check (visibility in ('Cliente', 'Interno', 'Studio')),
   category text default 'Altro',
   tags text default '',
   document_status text default 'Pubblicato',
+  comment text default '',
   parent_document_id text default '',
   version_number integer default 1,
   source text default 'Studio',
@@ -69,6 +71,13 @@ create table if not exists public.documents (
   file_name text default '',
   mime_type text default '',
   file_size integer default 0
+);
+
+create table if not exists public.document_folders (
+  id text primary key,
+  project_id text not null references public.projects(id) on delete cascade,
+  name text not null,
+  description text default ''
 );
 
 create table if not exists public.notifications (
@@ -222,14 +231,24 @@ insert into public.projects (
   )
 on conflict (id) do nothing;
 
+insert into public.document_folders (id, project_id, name, description) values
+  ('folder-planimetrie-bianchi', 'villa-bianchi', 'Planimetrie', 'Elaborati grafici e tavole'),
+  ('folder-pratiche-comunali-bianchi', 'villa-bianchi', 'Pratiche comunali', 'Comunicazioni, protocolli e autorizzazioni'),
+  ('folder-antincendio-bianchi', 'villa-bianchi', 'Pratiche antincendio', 'Documenti Vigili del Fuoco e sicurezza'),
+  ('folder-foto-bianchi', 'villa-bianchi', 'Foto sopralluogo', 'Immagini e rilievi fotografici'),
+  ('folder-vuota-bianchi', 'villa-bianchi', 'Collaudi e certificazioni', 'Cartella pronta per documenti futuri'),
+  ('folder-generale-verdi', 'negozio-verdi', 'Documentazione generale', 'Materiale condiviso con il cliente'),
+  ('folder-consegna-neri', 'studio-neri', 'Consegna finale', 'Documenti conclusivi')
+on conflict (id) do nothing;
+
 insert into public.documents (
-  id, project_id, title, type, version, date, visibility, category, tags,
-  document_status, parent_document_id, version_number, storage_key, file_name, mime_type, file_size
+  id, project_id, folder_id, title, type, version, date, visibility, category, tags,
+  document_status, comment, parent_document_id, version_number, storage_key, file_name, mime_type, file_size
 ) values
-  ('doc-relazione-bianchi', 'villa-bianchi', 'Relazione tecnica preliminare', 'PDF', 'v1.2', '02 Mag 2026', 'Cliente', 'Relazione tecnica', 'comune, preliminare', 'Pubblicato', '', 1, '', '', '', 0),
-  ('doc-planimetria-bianchi', 'villa-bianchi', 'Planimetria stato di fatto', 'DWG', 'v1.0', '27 Apr 2026', 'Cliente', 'Planimetria', '', 'Pubblicato', '', 1, '', '', '', 0),
-  ('doc-preventivo-bianchi', 'villa-bianchi', 'Preventivo opere tecniche', 'PDF', 'v1.1', '21 Apr 2026', 'Interno', 'Preventivo', '', 'Pubblicato', '', 1, '', '', '', 0),
-  ('doc-integrazione-verdi', 'negozio-verdi', 'Richiesta integrazione documenti', 'PDF', 'v1.0', '29 Apr 2026', 'Cliente', 'Autorizzazione', '', 'Pubblicato', '', 1, '', '', '', 0)
+  ('doc-relazione-bianchi', 'villa-bianchi', 'folder-pratiche-comunali-bianchi', 'Relazione tecnica preliminare', 'PDF', 'v1.2', '02 Mag 2026', 'Cliente', 'Relazione tecnica', 'comune, preliminare', 'Pubblicato', 'Documento caricato dallo studio.', '', 1, '', '', '', 0),
+  ('doc-planimetria-bianchi', 'villa-bianchi', 'folder-planimetrie-bianchi', 'Planimetria stato di fatto', 'DWG', 'v1.0', '27 Apr 2026', 'Cliente', 'Planimetria', '', 'Pubblicato', 'Tavola aggiornata dopo sopralluogo.', '', 1, '', '', '', 0),
+  ('doc-preventivo-bianchi', 'villa-bianchi', 'folder-pratiche-comunali-bianchi', 'Preventivo opere tecniche', 'PDF', 'v1.1', '21 Apr 2026', 'Interno', 'Preventivo', '', 'Pubblicato', 'Documento caricato dallo studio.', '', 1, '', '', '', 0),
+  ('doc-integrazione-verdi', 'negozio-verdi', 'folder-generale-verdi', 'Richiesta integrazione documenti', 'PDF', 'v1.0', '29 Apr 2026', 'Cliente', 'Autorizzazione', '', 'Pubblicato', 'Documento caricato dallo studio.', '', 1, '', '', '', 0)
 on conflict (id) do nothing;
 
 insert into public.timeline (id, project_id, date, title, body) values

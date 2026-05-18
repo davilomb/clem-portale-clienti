@@ -1295,6 +1295,28 @@ function notificationRows() {
     .join("");
 }
 
+function notificationDiagnosticRows(limit = 8) {
+  const items = state.data.notifications || [];
+  if (!items.length) return `<div class="empty-state">Nessuna notifica registrata.</div>`;
+  return items
+    .slice(0, limit)
+    .map((item) => {
+      const channel = item.channel || "Email";
+      const statusClass = item.status === "Inviata" ? "done" : item.status?.startsWith("Errore") ? "blocked" : "waiting";
+      return `
+        <article class="notification-diagnostic">
+          <div>
+            <strong>${escapeHtml(item.subject)}</strong>
+            <span>${escapeHtml(item.recipientEmail || item.recipientPhone || "Destinatario mancante")} · ${escapeHtml(item.createdAt || "")}</span>
+          </div>
+          <span class="status ${statusClass}">${escapeHtml(item.status || "Da verificare")}</span>
+          <small>${escapeHtml(channel)} · ${escapeHtml(item.notificationType || "")}</small>
+        </article>
+      `;
+    })
+    .join("");
+}
+
 function adminModalShell(title, body) {
   if (!state.adminModal) return "";
   return `
@@ -2039,6 +2061,17 @@ function adminSettings() {
           </article>
         </div>
       </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2>Test e diagnostica email</h2><span class="readonly-pill">Brevo</span></div>
+        <form class="panel-body form-grid" data-test-email>
+          <div class="field wide"><label>Email destinatario test</label><input name="email" type="email" value="${escapeHtml(state.user?.email || settings.replyToEmail || settings.emailFrom)}" required /></div>
+          <button class="button wide" type="submit">Invia email test</button>
+        </form>
+        <div class="panel-body settings-preview">
+          ${notificationDiagnosticRows()}
+        </div>
+      </section>
     </div>
   `;
 }
@@ -2320,6 +2353,20 @@ function bindWorkspaceActions() {
         alert(error.message);
       }
     });
+  });
+
+  document.querySelector("[data-test-email]")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await api("/api/settings/test-email", {
+        method: "POST",
+        body: JSON.stringify(formValues(event.currentTarget)),
+      });
+      await loadBootstrap();
+      renderWorkspace();
+    } catch (error) {
+      alert(error.message);
+    }
   });
 
   const filterForm = document.querySelector("[data-document-filters]");

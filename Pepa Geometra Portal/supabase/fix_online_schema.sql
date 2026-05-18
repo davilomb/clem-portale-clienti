@@ -37,45 +37,6 @@ insert into public.document_folders (id, project_id, name, description) values
   ('folder-consegna-neri', 'studio-neri', 'Consegna finale', 'Documenti conclusivi')
 on conflict (id) do nothing;
 
-alter table public.projects
-  add column if not exists work_amount numeric default 0,
-  add column if not exists technical_fee numeric default 0,
-  add column if not exists project_photos jsonb default '[]'::jsonb;
-
-alter table public.timeline
-  add column if not exists color text default '#2f6f6d',
-  add column if not exists visibility text default 'Cliente';
-
-alter table public.events
-  add column if not exists color text default '#c78734',
-  add column if not exists visibility text default 'Cliente';
-
-alter table public.checklist
-  add column if not exists notes text default '';
-
-alter table public.requests
-  add column if not exists upload_required boolean default false,
-  add column if not exists requested_document_title text default '',
-  add column if not exists uploaded_document_id text default '';
-
-alter table public.clients
-  add column if not exists company_name text default '',
-  add column if not exists client_type text default 'Privato',
-  add column if not exists tax_code text default '',
-  add column if not exists vat_number text default '',
-  add column if not exists pec text default '',
-  add column if not exists billing_code text default '',
-  add column if not exists address text default '',
-  add column if not exists city text default '',
-  add column if not exists province text default '',
-  add column if not exists zip text default '',
-  add column if not exists lead_source text default '',
-  add column if not exists crm_status text default 'Attivo',
-  add column if not exists internal_owner text default 'Studio',
-  add column if not exists privacy_status text default 'Da verificare',
-  add column if not exists internal_notes text default '',
-  add column if not exists public_notes text default '';
-
 create table if not exists public.notifications (
   id text primary key,
   project_id text references public.projects(id) on delete cascade,
@@ -91,6 +52,9 @@ create table if not exists public.notifications (
   created_at text default '',
   sent_at text default ''
 );
+
+alter table public.notifications
+  alter column project_id drop not null;
 
 create table if not exists public.app_settings (
   id text primary key,
@@ -120,22 +84,10 @@ insert into public.app_settings (id, value, updated_at) values
   )
 on conflict (id) do nothing;
 
-alter table public.notifications
-  alter column project_id drop not null;
-
-alter table public.notifications
-  add column if not exists channel text not null default 'Email',
-  add column if not exists recipient_phone text default '';
-
 update public.documents
 set
   folder_id = coalesce(folder_id, ''),
-  category = case
-    when lower(title) like '%planimetria%' then 'Planimetria'
-    when lower(title) like '%preventivo%' then 'Preventivo'
-    when lower(title) like '%relazione%' then 'Relazione tecnica'
-    else coalesce(category, 'Altro')
-  end,
+  category = coalesce(category, 'Altro'),
   document_status = coalesce(document_status, 'Pubblicato'),
   comment = coalesce(comment, ''),
   parent_document_id = coalesce(parent_document_id, ''),

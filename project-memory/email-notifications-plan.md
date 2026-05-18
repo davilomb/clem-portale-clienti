@@ -102,3 +102,5 @@ Brevo e' stato creato con l'account `inbolla.web@gmail.com`, che e' anche il rif
 - Backend: aggiunta persistenza settings notifiche, endpoint `/api/settings/notifications`, endpoint `/api/users` per creare/modificare utenti studio, mittente dinamico per invio email.
 - Database: aggiunta tabella `app_settings`; `notifications.project_id` resta nullable per email accesso non legate a progetto.
 - Frontend: Settings mostra canali email, predisposizione WhatsApp, utenti studio, creazione nuovo utente Geometra e scelta dell'email mittente.
+- Correzione schema online: aggiunto `supabase/fix_online_schema.sql` per riallineare Supabase quando mancano `document_folders`, `documents.comment`, `documents.folder_id` o colonne file; include refresh cache PostgREST con `notify pgrst, 'reload schema'`.
+- Diagnostica: aggiunto test email nei Settings (`/api/settings/test-email`) e lista ultime notifiche con stato per capire se l'invio e' riuscito, bloccato da configurazione o fallito presso il provider.
