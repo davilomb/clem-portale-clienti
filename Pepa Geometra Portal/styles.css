@@ -1108,6 +1108,10 @@ button {
   text-transform: uppercase;
 }
 
+.doc-table-row.client-upload-row {
+  background: #fffaf0;
+}
+
 .doc-table-row strong {
   display: block;
   margin-bottom: 3px;
@@ -1706,6 +1710,17 @@ button {
   font-size: 13px;
 }
 
+.uploaded-meta {
+  color: #8a5a18;
+  font-weight: 800;
+}
+
+.client-upload-panel {
+  margin-top: 14px;
+  border-color: #e8c98d;
+  background: #fffbf3;
+}
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -1797,6 +1812,10 @@ button {
   display: grid;
   justify-items: end;
   gap: 8px;
+}
+
+.request-actions .split-actions {
+  justify-content: flex-end;
 }
 
 .modal-backdrop {

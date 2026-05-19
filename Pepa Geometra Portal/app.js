@@ -625,14 +625,45 @@ function clientUploadedDocuments() {
   return state.data.documents.filter((doc) => doc.source === "Cliente");
 }
 
+function clientUploadedDocumentForRequest(requestId) {
+  return state.data.documents.find((doc) => doc.requestId === requestId || doc.id === requestId);
+}
+
+function clientUploadQuickPanel(projectId) {
+  const docs = clientUploadedDocuments().filter((doc) => doc.projectId === projectId);
+  if (!docs.length) return "";
+  return `
+    <section class="panel client-upload-panel">
+      <div class="panel-header">
+        <h2>Documenti caricati dal cliente</h2>
+        <span class="status waiting">${docs.length} da verificare</span>
+      </div>
+      <div class="panel-body document-list">
+        <div class="doc-table">
+          <div class="doc-table-head">
+            <span>Documento</span>
+            <span>Versione</span>
+            <span>Commento cliente</span>
+            <span>Data</span>
+            <span>Stato</span>
+            <span>Azioni</span>
+          </div>
+          ${documentTableRows(docs)}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function documentTableRows(documents) {
   return documents
     .map(
       (doc) => `
-      <div class="doc-table-row">
+      <div class="doc-table-row ${doc.source === "Cliente" ? "client-upload-row" : ""}">
         <div>
           <strong>${escapeHtml(doc.title)}</strong>
           ${doc.tags ? `<span class="tag-list">${doc.tags.split(",").map((tag) => `<span>${escapeHtml(tag.trim())}</span>`).join("")}</span>` : ""}
+          ${doc.source === "Cliente" ? `<span class="doc-meta">Caricato dal cliente · ${escapeHtml(doc.fileName || "file")}</span>` : ""}
         </div>
         <div>${escapeHtml(doc.version)}</div>
         <div>${escapeHtml(doc.comment || "Nessun commento")}</div>
@@ -1215,18 +1246,22 @@ function requestRows(projectId) {
   const items = state.data.requests.filter((item) => item.projectId === projectId);
   if (!items.length) return `<div class="empty-state">Nessuna richiesta aperta per il cliente.</div>`;
   return items
-    .map(
-      (item) => `
+    .map((item) => {
+      const uploadedDoc = item.uploadedDocumentId ? state.data.documents.find((doc) => doc.id === item.uploadedDocumentId) : clientUploadedDocumentForRequest(item.id);
+      return `
       <div class="request-item">
         <div>
           <strong>${escapeHtml(item.title)}</strong>
           <p class="muted">${escapeHtml(item.body)}</p>
           <span class="doc-meta">Scadenza: ${escapeHtml(item.dueDate)}</span>
+          ${uploadedDoc ? `<span class="doc-meta uploaded-meta">File ricevuto: ${escapeHtml(uploadedDoc.fileName || uploadedDoc.title)} · ${escapeHtml(uploadedDoc.date)}</span>` : ""}
         </div>
         <div class="request-actions">
           <span class="status ${statusClass(item.status)}">${escapeHtml(item.status)}</span>
           ${
-            state.user.role !== "Geometra" && item.uploadRequired && item.status !== "Caricato dal cliente"
+            state.user.role === "Geometra" && uploadedDoc
+              ? documentActions(uploadedDoc)
+              : state.user.role !== "Geometra" && item.uploadRequired && item.status !== "Caricato dal cliente"
               ? `<button class="button secondary" data-upload-request="${escapeHtml(item.id)}">Gestione</button>`
               : state.user.role !== "Geometra" && item.uploadRequired
                 ? `<span class="readonly-pill">Documento inviato</span>`
@@ -1234,8 +1269,8 @@ function requestRows(projectId) {
           }
         </div>
       </div>
-    `,
-    )
+    `;
+    })
     .join("");
 }
 
@@ -1728,6 +1763,7 @@ function adminProjectDetail() {
               <div class="panel-header"><h2>Richieste pubblicate</h2>${visibilityBadge(true)}</div>
               <div class="panel-body request-list">${requestRows(project.id)}</div>
             </section>
+            ${clientUploadQuickPanel(project.id)}
           </div>
           <div class="write-zone">
             <section class="panel action-panel">
