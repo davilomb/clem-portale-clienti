@@ -27,6 +27,11 @@ create table if not exists public.document_folders (
   description text default ''
 );
 
+alter table public.requests
+  add column if not exists upload_required boolean default false,
+  add column if not exists requested_document_title text default '',
+  add column if not exists uploaded_document_id text default '';
+
 insert into public.document_folders (id, project_id, name, description) values
   ('folder-planimetrie-bianchi', 'villa-bianchi', 'Planimetrie', 'Elaborati grafici e tavole'),
   ('folder-pratiche-comunali-bianchi', 'villa-bianchi', 'Pratiche comunali', 'Comunicazioni, protocolli e autorizzazioni'),
@@ -75,6 +80,7 @@ insert into public.app_settings (id, value, updated_at) values
       "emailFromName": "InBolla",
       "emailFrom": "inbolla.web@gmail.com",
       "replyToEmail": "inbolla.web@gmail.com",
+      "studioNotificationEmail": "inbolla.web@gmail.com",
       "whatsappSender": "InBolla",
       "whatsappPhone": "",
       "whatsappBusinessAccountId": "",
@@ -83,6 +89,13 @@ insert into public.app_settings (id, value, updated_at) values
     'Da configurare'
   )
 on conflict (id) do nothing;
+
+update public.app_settings
+set value = value || jsonb_build_object(
+  'studioNotificationEmail',
+  coalesce(value->>'studioNotificationEmail', value->>'emailFrom', 'inbolla.web@gmail.com')
+)
+where id = 'notifications';
 
 update public.documents
 set

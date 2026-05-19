@@ -28,6 +28,7 @@ const defaultNotificationSettings = {
   emailFromName,
   emailFrom,
   replyToEmail: emailFrom,
+  studioNotificationEmail: emailFrom,
   whatsappSender: "InBolla",
   whatsappPhone: "",
   whatsappBusinessAccountId: "",
@@ -126,6 +127,7 @@ function normalizeNotificationSettings(payload = {}, current = defaultNotificati
     emailFromName: payload.emailFromName || payload.senderName || current.emailFromName || emailFromName,
     emailFrom: payload.emailFrom || payload.senderEmail || current.emailFrom || emailFrom,
     replyToEmail: payload.replyToEmail || current.replyToEmail || emailFrom,
+    studioNotificationEmail: payload.studioNotificationEmail || current.studioNotificationEmail || current.replyToEmail || emailFrom,
     whatsappSender: payload.whatsappSender || payload.messageSender || current.whatsappSender || "InBolla",
     whatsappPhone: payload.whatsappPhone || current.whatsappPhone || "",
     whatsappBusinessAccountId: payload.whatsappBusinessAccountId || current.whatsappBusinessAccountId || "",
@@ -297,6 +299,10 @@ function clientForProject(db, projectId) {
 }
 
 function studioRecipient(db) {
+  const settings = notificationSettings(db);
+  if (settings.studioNotificationEmail) {
+    return { email: settings.studioNotificationEmail, phone: settings.whatsappPhone || "", name: settings.emailFromName || "Studio" };
+  }
   const admin = db.users.find((user) => isAdmin(user) && user.email);
   return admin ? { email: admin.email, phone: admin.phone || "", name: admin.name } : null;
 }
@@ -1277,6 +1283,38 @@ async function handleApi(req, res) {
     return;
   }
 
+  if ((req.method === "PATCH" || req.method === "DELETE") && url.pathname.startsWith("/api/documents/")) {
+    const documentId = decodeURIComponent(url.pathname.replace("/api/documents/", ""));
+    const document = db.documents.find((item) => item.id === documentId);
+    if (!document) {
+      sendJson(res, 404, { error: "Documento non trovato" });
+      return;
+    }
+    if (req.method === "DELETE") {
+      const linkedRequest = db.requests.find((item) => item.uploadedDocumentId === documentId || item.id === document.requestId);
+      await store.delete("documents", documentId);
+      if (linkedRequest) {
+        await store.update("requests", linkedRequest.id, {
+          status: linkedRequest.uploadRequired ? "In attesa cliente" : linkedRequest.status,
+          uploadedDocumentId: "",
+        });
+      }
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    const payload = await bodyJson(req);
+    await store.update("documents", documentId, {
+      title: payload.title || document.title,
+      documentStatus: payload.documentStatus || document.documentStatus,
+      comment: payload.comment ?? document.comment,
+      tags: payload.tags ?? document.tags,
+      visibility: payload.visibility || document.visibility,
+      category: payload.category || document.category,
+    });
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/document-folders") {
     const payload = await bodyJson(req);
     if (!payload.projectId || !payload.name) {
@@ -1438,6 +1476,32 @@ async function handleApi(req, res) {
       if (shouldNotifyByChat) await queueNotification(store, db, { ...notificationBase, channel: "WhatsApp/SMS" });
     }
     sendJson(res, 201, { ok: true });
+    return;
+  }
+
+  if ((req.method === "PATCH" || req.method === "DELETE") && url.pathname.startsWith("/api/requests/")) {
+    const requestId = decodeURIComponent(url.pathname.replace("/api/requests/", ""));
+    const request = db.requests.find((item) => item.id === requestId);
+    if (!request) {
+      sendJson(res, 404, { error: "Richiesta non trovata" });
+      return;
+    }
+    if (req.method === "DELETE") {
+      await store.delete("requests", requestId);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    const payload = await bodyJson(req);
+    await store.update("requests", requestId, {
+      title: payload.title || request.title,
+      body: payload.body || request.body,
+      status: payload.status || request.status,
+      dueDate: payload.dueDate || request.dueDate,
+      uploadRequired: payload.uploadRequired === "true" || payload.uploadRequired === true,
+      requestedDocumentTitle: payload.requestedDocumentTitle ?? request.requestedDocumentTitle,
+      uploadedDocumentId: request.uploadedDocumentId || "",
+    });
+    sendJson(res, 200, { ok: true });
     return;
   }
 

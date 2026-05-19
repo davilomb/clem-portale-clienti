@@ -171,6 +171,7 @@ insert into public.app_settings (id, value, updated_at) values
       "emailFromName": "InBolla",
       "emailFrom": "inbolla.web@gmail.com",
       "replyToEmail": "inbolla.web@gmail.com",
+      "studioNotificationEmail": "inbolla.web@gmail.com",
       "whatsappSender": "InBolla",
       "whatsappPhone": "",
       "whatsappBusinessAccountId": "",

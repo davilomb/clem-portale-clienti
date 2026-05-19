@@ -10,6 +10,8 @@ const state = {
   uploadRequestId: null,
   adminModal: "",
   selectedTaskId: "",
+  selectedRequestId: "",
+  selectedDocumentId: "",
   selectedHistoryType: "",
   selectedHistoryId: "",
   hideCompletedTasks: false,
@@ -27,6 +29,7 @@ const state = {
     emailFromName: "InBolla",
     emailFrom: "inbolla.web@gmail.com",
     replyToEmail: "inbolla.web@gmail.com",
+    studioNotificationEmail: "inbolla.web@gmail.com",
     whatsappSender: "InBolla",
     whatsappPhone: "",
     whatsappBusinessAccountId: "",
@@ -614,6 +617,7 @@ function documentActions(doc) {
   return `
     <a class="button secondary" href="${href}" target="_blank" rel="noreferrer">Apri</a>
     <a class="button secondary" href="${href}" download>Scarica</a>
+    ${state.user?.role === "Geometra" ? `<button class="button secondary" data-document-open="${escapeHtml(doc.id)}" type="button">Modifica</button><button class="button secondary danger-button" data-delete-record="documents:${escapeHtml(doc.id)}" type="button">Elimina</button>` : ""}
   `;
 }
 
@@ -668,7 +672,15 @@ function documentTableRows(documents) {
         <div>${escapeHtml(doc.version)}</div>
         <div>${escapeHtml(doc.comment || "Nessun commento")}</div>
         <div>${escapeHtml(doc.date)}</div>
-        <div><span class="status ${statusClass(doc.documentStatus)}">${escapeHtml(doc.documentStatus || "Provvisorio")}</span></div>
+        <div>
+          ${
+            state.user?.role === "Geometra"
+              ? `<select data-document-status="${escapeHtml(doc.id)}" aria-label="Stato documento">
+                  ${["Da verificare", "Provvisorio", "Bozza", "Definitivo", "Archiviato"].map((status) => `<option ${doc.documentStatus === status ? "selected" : ""}>${status}</option>`).join("")}
+                </select>`
+              : `<span class="status ${statusClass(doc.documentStatus)}">${escapeHtml(doc.documentStatus || "Provvisorio")}</span>`
+          }
+        </div>
         <div class="split-actions">${documentActions(doc)}</div>
       </div>
     `,
@@ -1260,8 +1272,16 @@ function requestRows(projectId) {
           <span class="status ${statusClass(item.status)}">${escapeHtml(item.status)}</span>
           ${
             state.user.role === "Geometra" && uploadedDoc
-              ? documentActions(uploadedDoc)
-              : state.user.role !== "Geometra" && item.uploadRequired && item.status !== "Caricato dal cliente"
+              ? `
+                <button class="button secondary" data-request-open="${escapeHtml(item.id)}" type="button">Modifica richiesta</button>
+                ${documentActions(uploadedDoc)}
+              `
+              : state.user.role === "Geometra"
+                ? `
+                  <button class="button secondary" data-request-open="${escapeHtml(item.id)}" type="button">Modifica</button>
+                  <button class="button secondary danger-button" data-delete-record="requests:${escapeHtml(item.id)}" type="button">Elimina</button>
+                `
+                : state.user.role !== "Geometra" && item.uploadRequired && item.status !== "Caricato dal cliente"
               ? `<button class="button secondary" data-upload-request="${escapeHtml(item.id)}">Gestione</button>`
               : state.user.role !== "Geometra" && item.uploadRequired
                 ? `<span class="readonly-pill">Documento inviato</span>`
@@ -1553,6 +1573,51 @@ function taskDetailForm() {
   `;
 }
 
+function requestDetailForm() {
+  const request = state.data.requests.find((item) => item.id === state.selectedRequestId);
+  if (!request) return `<div class="panel-body empty-state">Richiesta non trovata.</div>`;
+  return `
+    <form class="panel-body form-grid" data-form="requestUpdate" data-record-id="${escapeHtml(request.id)}">
+      <input type="hidden" name="projectId" value="${escapeHtml(request.projectId)}" />
+      <div class="field wide"><label>Titolo</label><input name="title" value="${escapeHtml(request.title)}" required /></div>
+      <div class="field wide"><label>Testo richiesta</label><textarea name="body" required>${escapeHtml(request.body)}</textarea></div>
+      <div class="field"><label>Stato</label><select name="status">
+        ${["Aperta", "In attesa cliente", "Caricato dal cliente", "Completata"].map((status) => `<option ${request.status === status ? "selected" : ""}>${status}</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Scadenza</label><input name="dueDate" value="${escapeHtml(request.dueDate || "Da definire")}" /></div>
+      <div class="field wide checkbox-field"><label><input name="uploadRequired" type="checkbox" value="true" ${request.uploadRequired ? "checked" : ""} /> Richiedi caricamento documento</label></div>
+      <div class="field wide"><label>Documento richiesto</label><input name="requestedDocumentTitle" value="${escapeHtml(request.requestedDocumentTitle || "")}" placeholder="es. Documento di identita', visura, delega firmata" /></div>
+      ${notificationOptions("requestUpdate")}
+      <button class="button" type="submit">Salva richiesta</button>
+      <button class="button secondary danger-button" data-delete-record="requests:${escapeHtml(request.id)}" type="button">Elimina richiesta</button>
+    </form>
+  `;
+}
+
+function documentDetailForm() {
+  const doc = state.data.documents.find((item) => item.id === state.selectedDocumentId);
+  if (!doc) return `<div class="panel-body empty-state">Documento non trovato.</div>`;
+  return `
+    <form class="panel-body form-grid" data-form="documentUpdate" data-record-id="${escapeHtml(doc.id)}">
+      <div class="field wide"><label>Titolo documento</label><input name="title" value="${escapeHtml(doc.title)}" required /></div>
+      <div class="field"><label>Stato</label><select name="documentStatus">
+        ${["Da verificare", "Provvisorio", "Bozza", "Definitivo", "Archiviato"].map((status) => `<option ${doc.documentStatus === status ? "selected" : ""}>${status}</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Visibilita'</label><select name="visibility">
+        <option ${doc.visibility === "Cliente" ? "selected" : ""}>Cliente</option>
+        <option ${doc.visibility === "Studio" ? "selected" : ""}>Studio</option>
+        <option ${doc.visibility === "Interno" ? "selected" : ""}>Interno</option>
+      </select></div>
+      <div class="field wide"><label>Commento</label><textarea name="comment">${escapeHtml(doc.comment || "")}</textarea></div>
+      <div class="field wide"><label>Tag</label><input name="tags" list="tagSuggestions" value="${escapeHtml(doc.tags || "")}" /></div>
+      <div class="field wide"><label>Categoria</label><input name="category" value="${escapeHtml(doc.category || "")}" /></div>
+      <button class="button" type="submit">Salva documento</button>
+      <button class="button secondary danger-button" data-delete-record="documents:${escapeHtml(doc.id)}" type="button">Elimina documento</button>
+      ${tagDatalist()}
+    </form>
+  `;
+}
+
 function historyDetailForm() {
   const collection = state.selectedHistoryType === "event" ? state.data.events : state.data.timeline;
   const item = collection.find((entry) => entry.id === state.selectedHistoryId);
@@ -1584,6 +1649,8 @@ function adminModalContent(project = currentProject()) {
     event: ["Nuova scadenza", project ? eventForm(project) : ""],
     history: ["Nuova voce timeline", project ? historyForm(project) : ""],
     taskDetail: ["Vista avanzata task", taskDetailForm()],
+    requestDetail: ["Modifica richiesta cliente", requestDetailForm()],
+    documentDetail: ["Modifica documento ricevuto", documentDetailForm()],
     historyDetail: ["Modifica voce scadenzario", historyDetailForm()],
   };
   const [title, body] = modalMap[state.adminModal] || ["", ""];
@@ -2030,6 +2097,7 @@ function adminSettings() {
           <div class="field"><label>Nome mittente email</label><input name="emailFromName" value="${escapeHtml(settings.emailFromName)}" /></div>
           <div class="field"><label>Email mittente</label><input name="emailFrom" list="studio-email-list" value="${escapeHtml(settings.emailFrom)}" /></div>
           <div class="field"><label>Email risposta</label><input name="replyToEmail" list="studio-email-list" value="${escapeHtml(settings.replyToEmail)}" /></div>
+          <div class="field wide"><label>Email operativa studio per upload cliente</label><input name="studioNotificationEmail" list="studio-email-list" value="${escapeHtml(settings.studioNotificationEmail || settings.emailFrom)}" /></div>
           <datalist id="studio-email-list">
             ${senderEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("")}
           </datalist>
@@ -2269,6 +2337,8 @@ function bindWorkspaceActions() {
     state.modalScrollY = window.scrollY;
     state.adminModal = "";
     state.selectedTaskId = "";
+    state.selectedRequestId = "";
+    state.selectedDocumentId = "";
     state.selectedHistoryId = "";
     state.selectedHistoryType = "";
     renderWorkspace();
@@ -2298,11 +2368,40 @@ function bindWorkspaceActions() {
     });
   });
 
+  document.querySelectorAll("[data-request-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedRequestId = button.dataset.requestOpen;
+      state.modalScrollY = window.scrollY;
+      state.adminModal = "requestDetail";
+      renderWorkspace();
+    });
+  });
+
+  document.querySelectorAll("[data-document-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedDocumentId = button.dataset.documentOpen;
+      state.modalScrollY = window.scrollY;
+      state.adminModal = "documentDetail";
+      renderWorkspace();
+    });
+  });
+
   document.querySelectorAll("[data-task-status]").forEach((select) => {
     select.addEventListener("change", async () => {
       await api(`/api/checklist/${encodeURIComponent(select.dataset.taskStatus)}`, {
         method: "PATCH",
         body: JSON.stringify({ status: select.value }),
+      });
+      await loadBootstrap();
+      renderWorkspace();
+    });
+  });
+
+  document.querySelectorAll("[data-document-status]").forEach((select) => {
+    select.addEventListener("change", async () => {
+      await api(`/api/documents/${encodeURIComponent(select.dataset.documentStatus)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ documentStatus: select.value }),
       });
       await loadBootstrap();
       renderWorkspace();
@@ -2332,6 +2431,8 @@ function bindWorkspaceActions() {
       await api(`/api/${table}/${encodeURIComponent(id)}`, { method: "DELETE", body: "{}" });
       state.adminModal = "";
       state.selectedTaskId = "";
+      state.selectedRequestId = "";
+      state.selectedDocumentId = "";
       state.selectedHistoryId = "";
       state.selectedHistoryType = "";
       await loadBootstrap();
@@ -2616,6 +2717,16 @@ function bindAdminForms() {
           });
         } else if (type === "checklistUpdate") {
           await api(`/api/checklist/${encodeURIComponent(form.dataset.recordId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(formValues(form)),
+          });
+        } else if (type === "requestUpdate") {
+          await api(`/api/requests/${encodeURIComponent(form.dataset.recordId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(formValues(form)),
+          });
+        } else if (type === "documentUpdate") {
+          await api(`/api/documents/${encodeURIComponent(form.dataset.recordId)}`, {
             method: "PATCH",
             body: JSON.stringify(formValues(form)),
           });
