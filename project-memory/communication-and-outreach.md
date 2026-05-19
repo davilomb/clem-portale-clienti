@@ -19,7 +19,7 @@ Punti da mantenere nelle email e nei materiali:
 Link pubblico da usare nei materiali email:
 
 ```txt
-https://inbolla.vercel.com
+https://inbolla.vercel.app
 ```
 
 Email mittente attualmente usata nei template:
@@ -117,13 +117,19 @@ Stato template corrente:
 - layout email a 640px;
 - logo InBolla in alto;
 - mascotte rimossa dall'angolo destro dell'header;
-- testo iniziale a larghezza piena e giustificato;
-- paragrafo `L'idea nasce...` in grassetto;
+- apertura Mailchimp ristrutturata per agganciare subito il geometra con il beneficio: far percepire ai clienti il valore del lavoro e ridurre fatica inutile nella gestione;
+- saluto iniziale rimosso: l'email apre direttamente con la promessa di valore;
+- presentazione di Davide e del fatto che e' di Rimini spostata dopo la promessa di valore;
+- testo iniziale a larghezza piena e giustificato dove utile;
+- messaggio chiave in grassetto: `Non e' un semplice gestionale...`;
 - immagine principale: `assets/hero-cliente-reale.png`;
+- CTA nel box benefici: `Prova la DEMO senza impegno` verso `https://inbolla.onrender.com/`, centrata e con nota piccola sul possibile caricamento iniziale della demo Render;
 - box `Condizioni beta agevolate` con `condizioni economiche agevolate` in grassetto;
-- CTA `Visita il sito ufficiale` verso `https://inbolla.vercel.com`;
+- CTA `Visita il sito ufficiale` verso `https://inbolla.vercel.app`;
 - firma con `inbolla.web@gmail.com`;
-- personalizzazione cognome Brevo: `{{ contact.LASTNAME }}`.
+- risposta finale richiesta: rispondere semplicemente `sono interessato`, poi Davide si mette in contatto diretto per organizzare una call conoscitiva;
+- personalizzazione cognome Brevo: `{{ contact.LASTNAME }}`;
+- personalizzazione cognome Mailchimp: `*|LNAME|*`.
 
 Oggetto consigliato:
 

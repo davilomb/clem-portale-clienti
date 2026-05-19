@@ -94,7 +94,7 @@ Se non disponibile:
 - `inbolla-geometri`
 - `inbolla-studi-tecnici`
 
-**Sito web:** `https://inbolla.vercel.com`
+**Sito web:** `https://inbolla.vercel.app`
 
 ### Dettagli azienda
 

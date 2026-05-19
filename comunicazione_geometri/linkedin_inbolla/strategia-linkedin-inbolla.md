@@ -69,7 +69,7 @@ InBolla nasce da un'esigenza concreta: aiutare il professionista tecnico a lavor
 
 La piattaforma e' in fase beta. I primi studi interessati possono richiedere una demo e valutare un percorso di attivazione con supporto personalizzato.
 
-Sito: https://inbolla.vercel.com
+Sito: https://inbolla.vercel.app
 
 ### Specializzazioni LinkedIn
 
@@ -202,7 +202,7 @@ Pulsante consigliato:
 
 URL:
 
-`https://inbolla.vercel.com`
+`https://inbolla.vercel.app`
 
 ## Calendario editoriale iniziale
 
@@ -403,7 +403,7 @@ In una demo di 15 minuti possiamo vedere:
 
 Senza impegno, solo per capire se ha senso anche per il tuo studio.
 
-**CTA:** Scrivimi qui su LinkedIn o visita https://inbolla.vercel.com
+**CTA:** Scrivimi qui su LinkedIn o visita https://inbolla.vercel.app
 
 **Hashtag:** `#geometri #demo #studiotecnico #digitalizzazione`
 
@@ -460,7 +460,7 @@ Buongiorno Geom. {{Cognome}}, ultimo messaggio da parte mia su InBolla.
 
 Se in futuro dovesse interessarle un portale clienti per rendere piu' ordinata la comunicazione tra studio e cliente, qui trova il sito:
 
-https://inbolla.vercel.com
+https://inbolla.vercel.app
 
 La ringrazio comunque per il tempo e le auguro buon lavoro.
 
@@ -495,7 +495,7 @@ Il geometra mantiene il controllo su cosa pubblicare e cosa rendere visibile. L'
 3. Caricare banner con messaggio "Il portale clienti per geometri".
 4. Inserire tagline.
 5. Inserire descrizione completa.
-6. Aggiungere sito `https://inbolla.vercel.com`.
+6. Aggiungere sito `https://inbolla.vercel.app`.
 7. Inserire settore e specializzazioni.
 8. Pubblicare il post 1 come post fissato in alto.
 9. Invitare contatti personali pertinenti.

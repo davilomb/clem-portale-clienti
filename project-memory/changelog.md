@@ -25,8 +25,21 @@
   - registrato database contatti geometri in `database_geometri_rimini_forli_cesena/`;
   - registrati CSV e liste Brevo in `comunicazione_geometri/liste/`;
   - registrato template email Brevo in `comunicazione_geometri/brevo_email_inbolla/`;
-  - annotato link campagna `https://inbolla.vercel.com`;
+  - annotato link campagna `https://inbolla.vercel.app`;
   - annotato stato template: logo, immagine `hero-cliente-reale.png`, paragrafo idea in grassetto, box condizioni beta e firma `inbolla.web@gmail.com`.
+- Ristrutturato template Mailchimp `email_mailchimp_supabase.html`:
+  - apertura generica `Buongiorno,`;
+  - promessa di valore in alto prima della presentazione personale;
+  - messaggio `Non e' un semplice gestionale...` in evidenza;
+  - presentazione di Davide/Rimini spostata dopo il blocco di valore;
+  - call to action finale: rispondere semplicemente `sono interessato`.
+- Rifinito template Mailchimp:
+  - rimosso il saluto iniziale;
+  - headline aggiornata con `del suo lavoro da geometra`;
+  - rimosso il paragrafo testuale ridondante sulla beta;
+  - aggiunta CTA nel box benefici `Prova la DEMO senza impegno` verso `https://inbolla.onrender.com/`.
+- Centrati i pulsanti del template Mailchimp e aggiunta nota sotto la CTA demo sul possibile tempo di avvio del servizio Render.
+- Corretto il link del sito vetrina nei materiali di comunicazione da dominio `.com` a `https://inbolla.vercel.app` e ripulito il template Mailchimp con accenti e punteggiatura italiana corretti.
 
 ## Stato precedente consolidato
 

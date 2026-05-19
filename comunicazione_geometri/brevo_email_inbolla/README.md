@@ -14,7 +14,7 @@ Note per Brevo:
 2. Se Brevo non mantiene i percorsi locali `assets/...`, sostituisci nel file HTML gli `src` delle immagini con gli URL generati dalla libreria Brevo.
 3. Il campo del cognome usa `{{ contact.LASTNAME }}`.
 4. La firma usa `inbolla.web@gmail.com`.
-5. La CTA punta a `https://inbolla.vercel.com`.
+5. La CTA punta a `https://inbolla.vercel.app`.
 
 Oggetto consigliato:
 Inbolla, una piattaforma per semplificare il rapporto tra studio e cliente

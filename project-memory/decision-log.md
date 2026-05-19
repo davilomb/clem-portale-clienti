@@ -27,7 +27,7 @@ Materiali correnti:
 - database contatti in `database_geometri_rimini_forli_cesena/`;
 - liste e CSV Brevo in `comunicazione_geometri/liste/`;
 - template email Brevo in `comunicazione_geometri/brevo_email_inbolla/`;
-- link CTA campagna: `https://inbolla.vercel.com`.
+- link CTA campagna: `https://inbolla.vercel.app`.
 
 Motivo: la campagna verso geometri e studi tecnici e' una fase commerciale esterna al prodotto; va tracciata per non perdere contesto, ma non deve introdurre automazioni reali nel gestionale senza una fase dedicata a provider, privacy e test.
 

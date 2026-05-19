@@ -77,7 +77,7 @@ def screenshot_card(img, draw, path_name, box):
 
 
 def draw_footer(draw):
-    draw.text((72, 1116), "inbolla.vercel.com", fill=MUTED, font=F_TINY)
+    draw.text((72, 1116), "inbolla.vercel.app", fill=MUTED, font=F_TINY)
     draw.text((872, 1116), "Portale clienti per geometri", fill=MUTED, font=F_TINY)
 
 
