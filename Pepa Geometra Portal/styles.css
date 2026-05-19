@@ -936,6 +936,11 @@ button {
   font-weight: 750;
 }
 
+.subnav button.active {
+  color: var(--brand-dark);
+  background: #e7f1ef;
+}
+
 .sidebar-footer {
   position: absolute;
   right: 18px;
@@ -1051,6 +1056,22 @@ button {
 .client-list {
   display: grid;
   gap: 10px;
+}
+
+.crm-client-list {
+  gap: 12px;
+}
+
+.crm-client-row {
+  grid-template-columns: minmax(260px, 1.2fr) minmax(180px, 0.7fr) auto;
+}
+
+.crm-row-meta {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .document-tree {
@@ -1411,6 +1432,10 @@ button {
 
 .row-item:hover {
   border-color: #adc6c4;
+}
+
+.row-item.crm-client-row {
+  grid-template-columns: minmax(260px, 1.2fr) minmax(180px, 0.7fr) auto;
 }
 
 .row-item strong {
@@ -1988,13 +2013,9 @@ button {
 
 .settings-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   align-items: start;
-}
-
-.settings-layout .panel:first-child {
-  grid-row: span 2;
 }
 
 .settings-users {

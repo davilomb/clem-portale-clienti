@@ -24,9 +24,11 @@
 - Document management must be top-down: client -> project -> folder/category -> file.
 - Uploaded client documents are part of the corresponding client/project context and must be reviewable, editable, status-changeable and deletable by the geometra.
 - Visibility labels should say whether an item is visible to the client or hidden/internal, not generic labels like "Vista".
+- Client CRM management belongs in the Geometra backend and should support create, edit and delete through contextual popups, not side forms.
+- Settings must be split into focused subsections from the sidebar: notifications, backend users, templates and diagnostics. Each settings screen should show only the relevant content.
+- Backend users are one concept: "utenti backend" / "utenti con accesso al backend", not separate duplicated blocks for existing users and new geometra users.
 
 ## Current Notification Behaviors
 - New client/user access should email credentials to the client when enabled.
 - New or updated project documents can notify the related client by email.
 - When a client uploads a requested document, the studio receives an email notification at `studioNotificationEmail`.
-

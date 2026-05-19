@@ -12,8 +12,11 @@ const state = {
   selectedTaskId: "",
   selectedRequestId: "",
   selectedDocumentId: "",
+  selectedClientId: "",
+  selectedUserId: "",
   selectedHistoryType: "",
   selectedHistoryId: "",
+  settingsSection: "notifications",
   hideCompletedTasks: false,
   adminScheduleView: "timeline",
   pendingScrollTarget: "",
@@ -504,11 +507,23 @@ function shell(content) {
                     </div>
                   `
                   : "";
+              const settingsSections =
+                isAdmin && route === "settings" && isActive
+                  ? `
+                    <div class="subnav">
+                      <button class="${state.settingsSection === "notifications" ? "active" : ""}" data-settings-section="notifications">Notifiche</button>
+                      <button class="${state.settingsSection === "users" ? "active" : ""}" data-settings-section="users">Utenti backend</button>
+                      <button class="${state.settingsSection === "templates" ? "active" : ""}" data-settings-section="templates">Template</button>
+                      <button class="${state.settingsSection === "diagnostics" ? "active" : ""}" data-settings-section="diagnostics">Diagnostica</button>
+                    </div>
+                  `
+                  : "";
               return `
                 <button class="${isActive ? "active" : ""}" data-route="${route}">
                   <span class="nav-icon">${icon(iconName)}</span>${label}
                 </button>
                 ${projectSections}
+                ${settingsSections}
               `;
             },
           )
@@ -540,6 +555,14 @@ function shell(content) {
       } else if (state.route !== "project") {
         state.route = "project";
       }
+      renderWorkspace();
+    });
+  });
+
+  document.querySelectorAll("[data-settings-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.route = "settings";
+      state.settingsSection = button.dataset.settingsSection;
       renderWorkspace();
     });
   });
@@ -1618,6 +1641,74 @@ function documentDetailForm() {
   `;
 }
 
+function clientForm(client = null, mode = "create") {
+  const isUpdate = mode === "update";
+  const value = (key, fallback = "") => escapeHtml(client?.[key] ?? fallback);
+  const clientUser = client ? state.data.users.find((user) => user.clientId === client.id) : null;
+  const option = (current, label) => `<option ${current === label ? "selected" : ""}>${label}</option>`;
+  return `
+    <form class="panel-body form-grid" data-form="${isUpdate ? "clientUpdate" : "client"}" ${isUpdate ? `data-record-id="${escapeHtml(client.id)}"` : ""}>
+      <div class="field wide"><label>Nome cliente</label><input name="name" value="${value("name")}" required /></div>
+      <div class="field"><label>Tipologia</label><select name="clientType">
+        ${["Privato", "Azienda", "Condominio", "Ente"].map((item) => option(client?.clientType, item)).join("")}
+      </select></div>
+      <div class="field"><label>Ragione sociale</label><input name="companyName" value="${value("companyName")}" /></div>
+      <div class="field"><label>Email</label><input name="email" type="email" value="${value("email")}" required /></div>
+      <div class="field"><label>Telefono</label><input name="phone" value="${value("phone")}" /></div>
+      <div class="field"><label>Codice fiscale</label><input name="taxCode" value="${value("taxCode")}" /></div>
+      <div class="field"><label>Partita IVA</label><input name="vatNumber" value="${value("vatNumber")}" /></div>
+      <div class="field"><label>PEC</label><input name="pec" type="email" value="${value("pec")}" /></div>
+      <div class="field"><label>Codice SDI</label><input name="billingCode" value="${value("billingCode")}" /></div>
+      <div class="field wide"><label>Indirizzo</label><input name="address" value="${value("address")}" /></div>
+      <div class="field"><label>Citta'</label><input name="city" value="${value("city")}" /></div>
+      <div class="field"><label>Provincia</label><input name="province" value="${value("province")}" /></div>
+      <div class="field"><label>CAP</label><input name="zip" value="${value("zip")}" /></div>
+      <div class="field"><label>Fonte contatto</label><select name="leadSource">
+        ${["Passaparola", "Sito web", "Cliente ricorrente", "Partner", "Altro"].map((item) => option(client?.leadSource, item)).join("")}
+      </select></div>
+      <div class="field"><label>Stato CRM</label><select name="crmStatus">
+        ${["Attivo", "Lead", "In valutazione", "Sospeso", "Archiviato"].map((item) => option(client?.crmStatus, item)).join("")}
+      </select></div>
+      <div class="field"><label>Referente interno</label><input name="internalOwner" value="${value("internalOwner", "Studio")}" /></div>
+      <div class="field"><label>Privacy/GDPR</label><select name="privacyStatus">
+        ${["Da verificare", "Consenso ricevuto", "Documenti mancanti"].map((item) => option(client?.privacyStatus, item)).join("")}
+      </select></div>
+      <div class="field"><label>Username cliente</label><input name="username" value="${escapeHtml(clientUser?.username || "")}" ${isUpdate ? "" : "required"} /></div>
+      <div class="field"><label>${isUpdate ? "Nuova password" : "Password temporanea"}</label><input name="password" placeholder="${isUpdate ? "Lascia vuoto per non cambiare" : ""}" ${isUpdate ? "" : "required"} /></div>
+      <div class="field wide"><label>Note interne studio</label><textarea name="internalNotes" placeholder="Informazioni non visibili al cliente">${value("internalNotes")}</textarea></div>
+      <div class="field wide"><label>Nota pubblicabile</label><textarea name="publicNotes" placeholder="Eventuale nota condivisibile, non mostrata finche' non viene usata nel portale">${value("publicNotes")}</textarea></div>
+      <button class="button wide" type="submit">${isUpdate ? "Salva cliente" : "Crea cliente e accesso"}</button>
+      ${isUpdate ? `<button class="button secondary danger-button wide" data-delete-record="clients:${escapeHtml(client.id)}" type="button">Elimina cliente</button>` : ""}
+    </form>
+  `;
+}
+
+function clientDetailForm() {
+  const client = state.data.clients.find((item) => item.id === state.selectedClientId);
+  if (!client) return `<div class="panel-body empty-state">Cliente non trovato.</div>`;
+  return clientForm(client, "update");
+}
+
+function studioUserForm(user = null, mode = "create") {
+  const isUpdate = mode === "update";
+  return `
+    <form class="panel-body form-grid" data-form="${isUpdate ? "userUpdate" : "userCreate"}" ${isUpdate ? `data-record-id="${escapeHtml(user.id)}"` : ""}>
+      <div class="field"><label>Nome</label><input name="name" value="${escapeHtml(user?.name || "")}" required /></div>
+      <div class="field"><label>Email comunicazioni</label><input name="email" type="email" value="${escapeHtml(user?.email || "")}" required /></div>
+      <div class="field"><label>Username</label><input name="username" value="${escapeHtml(user?.username || "")}" required /></div>
+      <div class="field"><label>${isUpdate ? "Nuova password" : "Password temporanea"}</label><input name="password" type="text" placeholder="${isUpdate ? "Lascia vuoto per non cambiare" : ""}" ${isUpdate ? "" : "required"} /></div>
+      <button class="button wide" type="submit">${isUpdate ? "Salva utente backend" : "Crea utente backend"}</button>
+      ${isUpdate ? `<button class="button secondary danger-button wide" data-delete-record="users:${escapeHtml(user.id)}" type="button">Elimina utente backend</button>` : ""}
+    </form>
+  `;
+}
+
+function studioUserDetailForm() {
+  const user = state.data.users.find((item) => item.id === state.selectedUserId);
+  if (!user) return `<div class="panel-body empty-state">Utente non trovato.</div>`;
+  return studioUserForm(user, "update");
+}
+
 function historyDetailForm() {
   const collection = state.selectedHistoryType === "event" ? state.data.events : state.data.timeline;
   const item = collection.find((entry) => entry.id === state.selectedHistoryId);
@@ -1641,6 +1732,10 @@ function adminModalContent(project = currentProject()) {
   const modalMap = {
     projectCreate: ["Crea progetto", projectCreateForm()],
     projectUpdate: ["Modifica panoramica", project ? projectUpdateForm(project) : ""],
+    clientCreate: ["Nuovo cliente CRM", clientForm()],
+    clientDetail: ["Scheda cliente CRM", clientDetailForm()],
+    userCreate: ["Nuovo utente backend", studioUserForm()],
+    userDetail: ["Modifica utente backend", studioUserDetailForm()],
     checklist: ["Aggiungi voce checklist", project ? checklistForm(project) : ""],
     request: ["Nuova richiesta al cliente", project ? requestForm(project) : ""],
     folder: ["Crea cartella documentale", project ? documentFolderForm(project.id) : ""],
@@ -2016,58 +2111,37 @@ function adminClients() {
         <h1>Clienti e accessi</h1>
         <p>Rubrica CRM interna: accessi cliente, dati amministrativi e note riservate allo studio.</p>
       </div>
+      <button class="button" data-admin-modal="clientCreate">Crea cliente</button>
     </div>
-    <div class="grid two">
-      <section class="panel">
-        <div class="panel-header"><h2>Rubrica clienti</h2></div>
-        <div class="panel-body client-list">
-          ${state.data.clients
-            .map(
-              (client) => `
-            <div class="row-item">
-              <span>
-                <strong>${escapeHtml(client.name)}</strong>
-                <span>${escapeHtml(client.email)} · ${escapeHtml(client.phone)}</span>
-                <span>${escapeHtml([client.clientType, client.city, client.crmStatus].filter(Boolean).join(" · "))}</span>
-              </span>
-              <span class="split-actions">
-                ${visibilityBadge(false, "Dati CRM interni")}
-                <span class="status progress">Accesso cliente</span>
-              </span>
-            </div>
-          `,
-            )
-            .join("")}
-        </div>
-      </section>
-      <section class="panel">
-        <div class="panel-header"><h2>Nuovo cliente</h2>${visibilityBadge(false, "CRM interno")}</div>
-        <form class="panel-body form-grid" data-form="client">
-          <div class="field wide"><label>Nome cliente</label><input name="name" required /></div>
-          <div class="field"><label>Tipologia</label><select name="clientType"><option>Privato</option><option>Azienda</option><option>Condominio</option><option>Ente</option></select></div>
-          <div class="field"><label>Ragione sociale</label><input name="companyName" /></div>
-          <div class="field"><label>Email</label><input name="email" type="email" required /></div>
-          <div class="field"><label>Telefono</label><input name="phone" /></div>
-          <div class="field"><label>Codice fiscale</label><input name="taxCode" /></div>
-          <div class="field"><label>Partita IVA</label><input name="vatNumber" /></div>
-          <div class="field"><label>PEC</label><input name="pec" type="email" /></div>
-          <div class="field"><label>Codice SDI</label><input name="billingCode" /></div>
-          <div class="field wide"><label>Indirizzo</label><input name="address" /></div>
-          <div class="field"><label>Citta'</label><input name="city" /></div>
-          <div class="field"><label>Provincia</label><input name="province" /></div>
-          <div class="field"><label>CAP</label><input name="zip" /></div>
-          <div class="field"><label>Fonte contatto</label><select name="leadSource"><option>Passaparola</option><option>Sito web</option><option>Cliente ricorrente</option><option>Partner</option><option>Altro</option></select></div>
-          <div class="field"><label>Stato CRM</label><select name="crmStatus"><option>Attivo</option><option>Lead</option><option>In valutazione</option><option>Sospeso</option><option>Archiviato</option></select></div>
-          <div class="field"><label>Referente interno</label><input name="internalOwner" value="Studio" /></div>
-          <div class="field"><label>Privacy/GDPR</label><select name="privacyStatus"><option>Da verificare</option><option>Consenso ricevuto</option><option>Documenti mancanti</option></select></div>
-          <div class="field"><label>Username</label><input name="username" required /></div>
-          <div class="field"><label>Password temporanea</label><input name="password" required /></div>
-          <div class="field wide"><label>Note interne studio</label><textarea name="internalNotes" placeholder="Informazioni non visibili al cliente"></textarea></div>
-          <div class="field wide"><label>Nota pubblicabile</label><textarea name="publicNotes" placeholder="Eventuale nota condivisibile, non mostrata finche' non viene usata nel portale"></textarea></div>
-          <button class="button wide" type="submit">Crea cliente e accesso</button>
-        </form>
-      </section>
-    </div>
+    <section class="panel">
+      <div class="panel-header"><h2>Rubrica clienti</h2>${visibilityBadge(false, "CRM interno")}</div>
+      <div class="panel-body client-list crm-client-list">
+        ${state.data.clients
+          .map((client) => {
+            const projects = state.data.projects.filter((project) => project.clientId === client.id);
+            const access = state.data.users.find((user) => user.clientId === client.id);
+            return `
+              <div class="row-item crm-client-row">
+                <span>
+                  <strong>${escapeHtml(client.name)}</strong>
+                  <span>${escapeHtml(client.email)} · ${escapeHtml(client.phone || "telefono non inserito")}</span>
+                  <span>${escapeHtml([client.clientType, client.city, client.crmStatus].filter(Boolean).join(" · "))}</span>
+                </span>
+                <span class="crm-row-meta">
+                  <span>${projects.length} progetti</span>
+                  <span>${access ? `Accesso: ${escapeHtml(access.username)}` : "Accesso non collegato"}</span>
+                </span>
+                <span class="split-actions">
+                  <button class="button secondary" data-client-open="${escapeHtml(client.id)}" type="button">Modifica</button>
+                  <button class="button secondary danger-button" data-delete-record="clients:${escapeHtml(client.id)}" type="button">Elimina</button>
+                </span>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+    ${adminModalContent()}
   `;
 }
 
@@ -2075,108 +2149,114 @@ function adminSettings() {
   const settings = state.notificationSettings;
   const studioUsers = (state.data.users || []).filter((user) => user.role === "Geometra");
   const senderEmails = [...new Set(studioUsers.map((user) => user.email).filter(Boolean))];
+  const notificationsSection = `
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Canali notifiche</h2>
+        <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">${settings.emailEnabled ? "Email abilitate" : "Email disabilitate"}</span>
+      </div>
+      <form class="panel-body form-grid" data-notification-settings>
+        <div class="field wide checkbox-field"><label><input name="emailEnabled" type="checkbox" value="true" ${settings.emailEnabled ? "checked" : ""} /> Abilita notifiche email</label></div>
+        <div class="field wide checkbox-field"><label><input name="defaultEmail" type="checkbox" value="true" ${settings.defaultEmail ? "checked" : ""} /> Seleziona email di default nei popup</label></div>
+        <div class="field"><label>Provider email</label><select name="emailProvider">
+          ${["Brevo", "Console test", "Resend", "SendGrid", "Da configurare"].map((item) => `<option ${settings.emailProvider === item ? "selected" : ""}>${item}</option>`).join("")}
+        </select></div>
+        <div class="field"><label>Nome mittente email</label><input name="emailFromName" value="${escapeHtml(settings.emailFromName)}" /></div>
+        <div class="field"><label>Email mittente</label><input name="emailFrom" list="studio-email-list" value="${escapeHtml(settings.emailFrom)}" /></div>
+        <div class="field"><label>Email risposta</label><input name="replyToEmail" list="studio-email-list" value="${escapeHtml(settings.replyToEmail)}" /></div>
+        <div class="field wide"><label>Email operativa studio per upload cliente</label><input name="studioNotificationEmail" list="studio-email-list" value="${escapeHtml(settings.studioNotificationEmail || settings.emailFrom)}" /></div>
+        <datalist id="studio-email-list">
+          ${senderEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("")}
+        </datalist>
+        <div class="field wide checkbox-field"><label><input name="messageEnabled" type="checkbox" value="true" ${settings.messageEnabled ? "checked" : ""} /> Predisponi messaggi WhatsApp/SMS nei popup</label></div>
+        <div class="field"><label>Provider messaggi futuro</label><select name="messageProvider">
+          ${["WhatsApp Cloud API", "Twilio", "Brevo Conversations", "Da configurare"].map((item) => `<option ${settings.messageProvider === item ? "selected" : ""}>${item}</option>`).join("")}
+        </select></div>
+        <div class="field"><label>Nome mittente messaggi</label><input name="whatsappSender" value="${escapeHtml(settings.whatsappSender)}" /></div>
+        <div class="field"><label>Numero WhatsApp Business</label><input name="whatsappPhone" value="${escapeHtml(settings.whatsappPhone)}" placeholder="+39 ..." /></div>
+        <div class="field"><label>Business account ID</label><input name="whatsappBusinessAccountId" value="${escapeHtml(settings.whatsappBusinessAccountId)}" placeholder="Da collegare in futuro" /></div>
+        <div class="field wide checkbox-field"><label><input name="defaultMessage" type="checkbox" value="true" ${settings.defaultMessage ? "checked" : ""} /> Seleziona messaggio di default nei popup quando sara' attivo</label></div>
+        <button class="button wide" type="submit">Salva impostazioni</button>
+      </form>
+    </section>
+  `;
+  const usersSection = `
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Utenti backend</h2>
+        <button class="button secondary" data-admin-modal="userCreate">Crea utente</button>
+      </div>
+      <div class="panel-body settings-users">
+        ${studioUsers.map((user) => `
+          <div class="settings-user-card">
+            <div class="settings-user-title">
+              <strong>${escapeHtml(user.name)}</strong>
+              ${user.email === settings.emailFrom ? `<span class="visibility-pill visible">Mittente comunicazioni</span>` : `<span class="visibility-pill hidden">Utente backend</span>`}
+            </div>
+            <div class="crm-row-meta">
+              <span>${escapeHtml(user.email)}</span>
+              <span>Username: ${escapeHtml(user.username)}</span>
+            </div>
+            <div class="split-actions">
+              <button class="button secondary" data-user-open="${escapeHtml(user.id)}" type="button">Modifica</button>
+              <button class="button secondary danger-button" data-delete-record="users:${escapeHtml(user.id)}" type="button">Elimina</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+  const templatesSection = `
+    <section class="panel">
+      <div class="panel-header"><h2>Template e stato integrazioni</h2><span class="readonly-pill">Architettura pronta</span></div>
+      <div class="panel-body settings-preview">
+        <article>
+          <strong>Creazione accesso cliente</strong>
+          <p>Email automatica con username, password temporanea e link al portale.</p>
+          <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">Email</span>
+        </article>
+        <article>
+          <strong>Documenti aggiornati</strong>
+          <p>Notifica al cliente con progetto, cartella, versione, stato e commento del documento.</p>
+          <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">Email</span>
+        </article>
+        <article>
+          <strong>Documento caricato dal cliente</strong>
+          <p>Avviso allo studio quando il cliente risponde a una richiesta con caricamento file.</p>
+          <span class="${settings.messageEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">WhatsApp futuro</span>
+        </article>
+      </div>
+    </section>
+  `;
+  const diagnosticsSection = `
+    <section class="panel">
+      <div class="panel-header"><h2>Test e diagnostica email</h2><span class="readonly-pill">Brevo</span></div>
+      <form class="panel-body form-grid" data-test-email>
+        <div class="field wide"><label>Email destinatario test</label><input name="email" type="email" value="${escapeHtml(state.user?.email || settings.replyToEmail || settings.emailFrom)}" required /></div>
+        <button class="button wide" type="submit">Invia email test</button>
+      </form>
+      <div class="panel-body settings-preview">
+        ${notificationDiagnosticRows()}
+      </div>
+    </section>
+  `;
+  const sections = {
+    notifications: notificationsSection,
+    users: usersSection,
+    templates: templatesSection,
+    diagnostics: diagnosticsSection,
+  };
   return `
     <div class="topbar">
       <div>
         <h1>Settings</h1>
-        <p>Configurazione operativa dei canali, dei mittenti e degli utenti studio che gestiscono il portale.</p>
+        <p>Configurazione operativa organizzata per sezioni: notifiche, utenti backend, template e diagnostica.</p>
       </div>
     </div>
     <div class="settings-layout">
-      <section class="panel">
-        <div class="panel-header">
-          <h2>Canali notifiche</h2>
-          <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">${settings.emailEnabled ? "Email abilitate" : "Email disabilitate"}</span>
-        </div>
-        <form class="panel-body form-grid" data-notification-settings>
-          <div class="field wide checkbox-field"><label><input name="emailEnabled" type="checkbox" value="true" ${settings.emailEnabled ? "checked" : ""} /> Abilita notifiche email</label></div>
-          <div class="field wide checkbox-field"><label><input name="defaultEmail" type="checkbox" value="true" ${settings.defaultEmail ? "checked" : ""} /> Seleziona email di default nei popup</label></div>
-          <div class="field"><label>Provider email</label><select name="emailProvider">
-            ${["Brevo", "Console test", "Resend", "SendGrid", "Da configurare"].map((item) => `<option ${settings.emailProvider === item ? "selected" : ""}>${item}</option>`).join("")}
-          </select></div>
-          <div class="field"><label>Nome mittente email</label><input name="emailFromName" value="${escapeHtml(settings.emailFromName)}" /></div>
-          <div class="field"><label>Email mittente</label><input name="emailFrom" list="studio-email-list" value="${escapeHtml(settings.emailFrom)}" /></div>
-          <div class="field"><label>Email risposta</label><input name="replyToEmail" list="studio-email-list" value="${escapeHtml(settings.replyToEmail)}" /></div>
-          <div class="field wide"><label>Email operativa studio per upload cliente</label><input name="studioNotificationEmail" list="studio-email-list" value="${escapeHtml(settings.studioNotificationEmail || settings.emailFrom)}" /></div>
-          <datalist id="studio-email-list">
-            ${senderEmails.map((email) => `<option value="${escapeHtml(email)}"></option>`).join("")}
-          </datalist>
-          <div class="field wide checkbox-field"><label><input name="messageEnabled" type="checkbox" value="true" ${settings.messageEnabled ? "checked" : ""} /> Predisponi messaggi WhatsApp/SMS nei popup</label></div>
-          <div class="field"><label>Provider messaggi futuro</label><select name="messageProvider">
-            ${["WhatsApp Cloud API", "Twilio", "Brevo Conversations", "Da configurare"].map((item) => `<option ${settings.messageProvider === item ? "selected" : ""}>${item}</option>`).join("")}
-          </select></div>
-          <div class="field"><label>Nome mittente messaggi</label><input name="whatsappSender" value="${escapeHtml(settings.whatsappSender)}" /></div>
-          <div class="field"><label>Numero WhatsApp Business</label><input name="whatsappPhone" value="${escapeHtml(settings.whatsappPhone)}" placeholder="+39 ..." /></div>
-          <div class="field"><label>Business account ID</label><input name="whatsappBusinessAccountId" value="${escapeHtml(settings.whatsappBusinessAccountId)}" placeholder="Da collegare in futuro" /></div>
-          <div class="field wide checkbox-field"><label><input name="defaultMessage" type="checkbox" value="true" ${settings.defaultMessage ? "checked" : ""} /> Seleziona messaggio di default nei popup quando sara' attivo</label></div>
-          <button class="button wide" type="submit">Salva impostazioni</button>
-        </form>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header"><h2>Utenti studio</h2><span class="readonly-pill">Lato Geometra</span></div>
-        <div class="panel-body settings-users">
-          ${studioUsers.map((user) => `
-            <form class="settings-user-card" data-user-update="${escapeHtml(user.id)}">
-              <div class="settings-user-title">
-                <strong>${escapeHtml(user.name)}</strong>
-                ${user.email === settings.emailFrom ? `<span class="visibility-pill visible">Mittente comunicazioni</span>` : `<span class="visibility-pill hidden">Utente studio</span>`}
-              </div>
-              <div class="form-grid compact-form">
-                <div class="field"><label>Nome</label><input name="name" value="${escapeHtml(user.name)}" required /></div>
-                <div class="field"><label>Email</label><input name="email" type="email" value="${escapeHtml(user.email)}" required /></div>
-                <div class="field"><label>Username</label><input name="username" value="${escapeHtml(user.username)}" required /></div>
-                <div class="field"><label>Nuova password</label><input name="password" type="text" placeholder="Lascia vuoto per non cambiare" /></div>
-                <button class="button secondary" type="submit">Salva utente</button>
-              </div>
-            </form>
-          `).join("")}
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header"><h2>Nuovo utente Geometra</h2><span class="edit-pill">Accesso studio</span></div>
-        <form class="panel-body form-grid" data-user-create>
-          <div class="field"><label>Nome</label><input name="name" required /></div>
-          <div class="field"><label>Email comunicazioni</label><input name="email" type="email" required /></div>
-          <div class="field"><label>Username</label><input name="username" required /></div>
-          <div class="field"><label>Password temporanea</label><input name="password" required /></div>
-          <button class="button wide" type="submit">Crea utente studio</button>
-        </form>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header"><h2>Template e stato integrazioni</h2><span class="readonly-pill">Architettura pronta</span></div>
-        <div class="panel-body settings-preview">
-          <article>
-            <strong>Creazione accesso cliente</strong>
-            <p>Email automatica con username, password temporanea e link al portale.</p>
-            <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">Email</span>
-          </article>
-          <article>
-            <strong>Documenti aggiornati</strong>
-            <p>Notifica al cliente con progetto, cartella, versione, stato e commento del documento.</p>
-            <span class="${settings.emailEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">Email</span>
-          </article>
-          <article>
-            <strong>Documento caricato dal cliente</strong>
-            <p>Avviso allo studio quando il cliente risponde a una richiesta con caricamento file.</p>
-            <span class="${settings.messageEnabled ? "visibility-pill visible" : "visibility-pill hidden"}">WhatsApp futuro</span>
-          </article>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header"><h2>Test e diagnostica email</h2><span class="readonly-pill">Brevo</span></div>
-        <form class="panel-body form-grid" data-test-email>
-          <div class="field wide"><label>Email destinatario test</label><input name="email" type="email" value="${escapeHtml(state.user?.email || settings.replyToEmail || settings.emailFrom)}" required /></div>
-          <button class="button wide" type="submit">Invia email test</button>
-        </form>
-        <div class="panel-body settings-preview">
-          ${notificationDiagnosticRows()}
-        </div>
-      </section>
+      ${sections[state.settingsSection] || notificationsSection}
     </div>
+    ${adminModalContent()}
   `;
 }
 
@@ -2339,6 +2419,8 @@ function bindWorkspaceActions() {
     state.selectedTaskId = "";
     state.selectedRequestId = "";
     state.selectedDocumentId = "";
+    state.selectedClientId = "";
+    state.selectedUserId = "";
     state.selectedHistoryId = "";
     state.selectedHistoryType = "";
     renderWorkspace();
@@ -2382,6 +2464,24 @@ function bindWorkspaceActions() {
       state.selectedDocumentId = button.dataset.documentOpen;
       state.modalScrollY = window.scrollY;
       state.adminModal = "documentDetail";
+      renderWorkspace();
+    });
+  });
+
+  document.querySelectorAll("[data-client-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedClientId = button.dataset.clientOpen;
+      state.modalScrollY = window.scrollY;
+      state.adminModal = "clientDetail";
+      renderWorkspace();
+    });
+  });
+
+  document.querySelectorAll("[data-user-open]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedUserId = button.dataset.userOpen;
+      state.modalScrollY = window.scrollY;
+      state.adminModal = "userDetail";
       renderWorkspace();
     });
   });
@@ -2433,6 +2533,8 @@ function bindWorkspaceActions() {
       state.selectedTaskId = "";
       state.selectedRequestId = "";
       state.selectedDocumentId = "";
+      state.selectedClientId = "";
+      state.selectedUserId = "";
       state.selectedHistoryId = "";
       state.selectedHistoryType = "";
       await loadBootstrap();
@@ -2727,6 +2829,21 @@ function bindAdminForms() {
           });
         } else if (type === "documentUpdate") {
           await api(`/api/documents/${encodeURIComponent(form.dataset.recordId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(formValues(form)),
+          });
+        } else if (type === "clientUpdate") {
+          await api(`/api/clients/${encodeURIComponent(form.dataset.recordId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(formValues(form)),
+          });
+        } else if (type === "userCreate") {
+          await api("/api/users", {
+            method: "POST",
+            body: JSON.stringify(formValues(form)),
+          });
+        } else if (type === "userUpdate") {
+          await api(`/api/users/${encodeURIComponent(form.dataset.recordId)}`, {
             method: "PATCH",
             body: JSON.stringify(formValues(form)),
           });

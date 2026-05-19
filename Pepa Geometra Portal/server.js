@@ -1163,6 +1163,26 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "DELETE" && url.pathname.startsWith("/api/users/")) {
+    const userId = decodeURIComponent(url.pathname.replace("/api/users/", ""));
+    const target = db.users.find((item) => item.id === userId);
+    if (!target) {
+      sendJson(res, 404, { error: "Utente non trovato" });
+      return;
+    }
+    if (target.id === user.id) {
+      sendJson(res, 400, { error: "Non puoi eliminare l'utente con cui sei collegato" });
+      return;
+    }
+    if (isAdmin(target) && db.users.filter((item) => isAdmin(item)).length <= 1) {
+      sendJson(res, 400, { error: "Deve restare almeno un utente backend" });
+      return;
+    }
+    await store.delete("users", userId);
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/projects") {
     const payload = await bodyJson(req);
     const client = db.clients.find((item) => item.id === payload.clientId);
@@ -1562,6 +1582,78 @@ async function handleApi(req, res) {
       channel: "Email",
     });
     sendJson(res, 201, { ok: true, id });
+    return;
+  }
+
+  if ((req.method === "PATCH" || req.method === "DELETE") && url.pathname.startsWith("/api/clients/")) {
+    const clientId = decodeURIComponent(url.pathname.replace("/api/clients/", ""));
+    const client = db.clients.find((item) => item.id === clientId);
+    if (!client) {
+      sendJson(res, 404, { error: "Cliente non trovato" });
+      return;
+    }
+    if (req.method === "DELETE") {
+      const projectIds = db.projects.filter((project) => project.clientId === clientId).map((project) => project.id);
+      for (const notification of db.notifications.filter((item) => projectIds.includes(item.projectId))) await store.delete("notifications", notification.id);
+      for (const notification of db.notifications.filter((item) => item.relatedType === "client" && item.relatedId === clientId)) await store.delete("notifications", notification.id);
+      for (const request of db.requests.filter((item) => projectIds.includes(item.projectId))) await store.delete("requests", request.id);
+      for (const item of db.checklist.filter((entry) => projectIds.includes(entry.projectId))) await store.delete("checklist", item.id);
+      for (const event of db.events.filter((item) => projectIds.includes(item.projectId))) await store.delete("events", event.id);
+      for (const entry of db.timeline.filter((item) => projectIds.includes(item.projectId))) await store.delete("timeline", entry.id);
+      for (const folder of (db.documentFolders || []).filter((item) => projectIds.includes(item.projectId))) await store.delete("documentFolders", folder.id);
+      for (const document of db.documents.filter((item) => projectIds.includes(item.projectId))) await store.delete("documents", document.id);
+      for (const project of db.projects.filter((item) => item.clientId === clientId)) await store.delete("projects", project.id);
+      for (const linkedUser of db.users.filter((item) => item.clientId === clientId)) await store.delete("users", linkedUser.id);
+      await store.delete("clients", clientId);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    const payload = await bodyJson(req);
+    if (!payload.name || !payload.email) {
+      sendJson(res, 400, { error: "Nome cliente ed email sono obbligatori" });
+      return;
+    }
+    const linkedUser = db.users.find((item) => item.clientId === clientId);
+    const username = String(payload.username || linkedUser?.username || "").trim();
+    if (linkedUser && username && db.users.some((item) => item.id !== linkedUser.id && item.username === username)) {
+      sendJson(res, 409, { error: "Username gia' presente" });
+      return;
+    }
+    await store.update("clients", clientId, {
+      name: payload.name,
+      email: payload.email,
+      phone: payload.phone || "",
+      companyName: payload.companyName || "",
+      clientType: payload.clientType || "Privato",
+      taxCode: payload.taxCode || "",
+      vatNumber: payload.vatNumber || "",
+      pec: payload.pec || "",
+      billingCode: payload.billingCode || "",
+      address: payload.address || "",
+      city: payload.city || "",
+      province: payload.province || "",
+      zip: payload.zip || "",
+      leadSource: payload.leadSource || "",
+      crmStatus: payload.crmStatus || "Attivo",
+      internalOwner: payload.internalOwner || "Studio",
+      privacyStatus: payload.privacyStatus || "Da verificare",
+      internalNotes: payload.internalNotes || "",
+      publicNotes: payload.publicNotes || "",
+    });
+    for (const project of db.projects.filter((item) => item.clientId === clientId)) {
+      await store.update("projects", project.id, { client: payload.name });
+    }
+    if (linkedUser) {
+      await store.update("users", linkedUser.id, {
+        username: username || linkedUser.username,
+        email: payload.email,
+        name: payload.name,
+        role: "Cliente",
+        password: payload.password ? payload.password : linkedUser.password,
+        clientId,
+      });
+    }
+    sendJson(res, 200, { ok: true });
     return;
   }
 

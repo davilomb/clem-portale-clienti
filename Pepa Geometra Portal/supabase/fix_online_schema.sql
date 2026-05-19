@@ -13,6 +13,24 @@ alter table public.documents
   add column if not exists mime_type text default '',
   add column if not exists file_size integer default 0;
 
+alter table public.clients
+  add column if not exists company_name text default '',
+  add column if not exists client_type text default 'Privato',
+  add column if not exists tax_code text default '',
+  add column if not exists vat_number text default '',
+  add column if not exists pec text default '',
+  add column if not exists billing_code text default '',
+  add column if not exists address text default '',
+  add column if not exists city text default '',
+  add column if not exists province text default '',
+  add column if not exists zip text default '',
+  add column if not exists lead_source text default '',
+  add column if not exists crm_status text default 'Attivo',
+  add column if not exists internal_owner text default 'Studio',
+  add column if not exists privacy_status text default 'Da verificare',
+  add column if not exists internal_notes text default '',
+  add column if not exists public_notes text default '';
+
 alter table public.documents
   drop constraint if exists documents_visibility_check;
 
